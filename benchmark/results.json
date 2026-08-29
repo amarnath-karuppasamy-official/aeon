@@ -1,0 +1,32 @@
+{
+  "Aeon": {
+    "create": 43.8,
+    "update": 32.1,
+    "clear": 28.4,
+    "rounds": 7
+  },
+  "Solid": {
+    "create": 30.9,
+    "update": 31.4,
+    "clear": 28.6,
+    "rounds": 7
+  },
+  "Preact": {
+    "create": 37.8,
+    "update": 28.4,
+    "clear": 29.1,
+    "rounds": 7
+  },
+  "Vue": {
+    "create": 36.6,
+    "update": 28.8,
+    "clear": 29.4,
+    "rounds": 7
+  },
+  "React": {
+    "create": 43,
+    "update": 28.8,
+    "clear": 28.3,
+    "rounds": 7
+  }
+}

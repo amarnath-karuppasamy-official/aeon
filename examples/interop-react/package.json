@@ -1,0 +1,12 @@
+{
+  "name": "aeon-interop-react-example",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "@aeon/core": "*",
+    "@aeon/interop": "*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

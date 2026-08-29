@@ -1,0 +1,7 @@
+{
+  "name": "preact-benchmark",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": { "preact": "^10.24.0" }
+}

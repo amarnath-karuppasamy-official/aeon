@@ -1,0 +1,9 @@
+{
+  "name": "@aeon/cli",
+  "version": "0.1.0",
+  "description": "Aeon CLI: scaffold, dev server, and production build powered by esbuild.",
+  "type": "module",
+  "bin": { "aeon": "./bin/aeon.mjs" },
+  "dependencies": { "esbuild": "^0.24.0" },
+  "optionalDependencies": { "@aeon/migrate": "^0.1.0" }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "aeon-verify-scripts",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Internal verification tooling only — not part of the Aeon workspace, not shipped.",
+  "dependencies": { "playwright-core": "1.48.2" }
+}

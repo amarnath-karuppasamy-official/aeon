@@ -1,0 +1,7 @@
+{
+  "name": "aeon-benchmark",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": { "@aeon/core": "*" }
+}

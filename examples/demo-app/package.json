@@ -1,0 +1,12 @@
+{
+  "name": "aeon-demo-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "@aeon/core": "*",
+    "@aeon/router": "*",
+    "@aeon/forms": "*",
+    "@aeon/di": "*"
+  }
+}

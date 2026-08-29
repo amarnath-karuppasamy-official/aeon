@@ -1,0 +1,25 @@
+{
+  "name": "@aeon/interop",
+  "version": "0.1.0",
+  "description": "Embed Aeon components inside another framework's tree, or read Aeon signals from it. Aeon mounts to a real DOM node it fully owns, so this is a plain escape hatch, not a virtual-DOM reconciliation bridge.",
+  "type": "module",
+  "sideEffects": false,
+  "engines": { "node": ">=18" },
+  "exports": {
+    "./react": "./src/react.js",
+    "./vue": "./src/vue.js",
+    "./vanilla": "./src/vanilla.js"
+  },
+  "peerDependencies": {
+    "@aeon/core": "^0.1.0",
+    "react": ">=17",
+    "vue": ">=3"
+  },
+  "peerDependenciesMeta": {
+    "react": { "optional": true },
+    "vue": { "optional": true }
+  },
+  "dependencies": {
+    "@aeon/core": "^0.1.0"
+  }
+}

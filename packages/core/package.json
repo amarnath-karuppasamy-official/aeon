@@ -1,0 +1,13 @@
+{
+  "name": "@aeon/core",
+  "version": "0.1.0",
+  "description": "Aeon core: signals, fine-grained DOM rendering, components. No virtual DOM.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "sideEffects": false,
+  "engines": { "node": ">=18" },
+  "files": ["src"]
+}

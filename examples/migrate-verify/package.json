@@ -1,0 +1,10 @@
+{
+  "name": "aeon-migrate-verify-example",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "@aeon/core": "*",
+    "react": "^19.0.0"
+  }
+}

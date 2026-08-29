@@ -1,0 +1,11 @@
+{
+  "name": "aeon-interop-vue-example",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "@aeon/core": "*",
+    "@aeon/interop": "*",
+    "vue": "^3.5.0"
+  }
+}

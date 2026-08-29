@@ -1,0 +1,10 @@
+{
+  "name": "@aeon/di",
+  "version": "0.1.0",
+  "description": "Aeon dependency injection: tokens, providers, injection — no decorators required.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": { ".": "./src/index.js" },
+  "sideEffects": false,
+  "engines": { "node": ">=18" }
+}

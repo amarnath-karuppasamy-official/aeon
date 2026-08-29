@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Aeon — drop-in script tag</title>
+    <style>body { font-family: system-ui, sans-serif; max-width: 480px; margin: 3rem auto; }</style>
+  </head>
+  <body>
+    <h1>No build step at all</h1>
+    <p>
+      This page has no <code>package.json</code>, no bundler, not even
+      <code>&lt;script type="module"&gt;</code>. It's one prebuilt file —
+      <code>dist-standalone/aeon.global.js</code> (~3.7&nbsp;kB gzipped for
+      core + router + forms + DI combined, ~2.2&nbsp;kB for core alone) —
+      loaded the way you'd load jQuery in 2012. Rebuild it any time with
+      <code>node scripts/build-standalone.mjs</code>.
+    </p>
+    <div id="app"></div>
+    <script src="/dist-standalone/aeon.global.js"></script>
+    <script>
+      // window.Aeon is the whole public API — same signals, same html`` tag,
+      // same mount() as the npm package.
+      const { signal, html, mount } = Aeon;
+      function Counter() {
+        const count = signal(0);
+        return html`<p id="out">Count: ${() => count.value}</p>
+          <button id="btn" @click=${() => count.value++}>+1</button>`;
+      }
+      mount(Counter, document.getElementById('app'));
+    </script>
+  </body>
+</html>
