@@ -4,8 +4,20 @@
   "description": "Aeon forms: signal-backed controls and groups with composable validators.",
   "type": "module",
   "main": "./src/index.js",
-  "exports": { ".": "./src/index.js" },
+  "exports": {
+    ".": "./src/index.js"
+  },
   "sideEffects": false,
-  "engines": { "node": ">=18" },
-  "dependencies": { "@aeon/core": "^0.1.0" }
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@aeon/core": "^0.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "src"
+  ]
 }

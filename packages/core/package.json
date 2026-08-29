@@ -8,6 +8,13 @@
     ".": "./src/index.js"
   },
   "sideEffects": false,
-  "engines": { "node": ">=18" },
-  "files": ["src"]
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

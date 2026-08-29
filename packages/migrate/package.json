@@ -5,12 +5,23 @@
   "type": "module",
   "sideEffects": false,
   "main": "./src/index.js",
-  "exports": { ".": "./src/index.js" },
-  "bin": { "aeon-migrate": "./bin/aeon-migrate.mjs" },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "bin": {
+    "aeon-migrate": "./bin/aeon-migrate.mjs"
+  },
   "dependencies": {
     "@babel/parser": "^8.0.4",
     "@babel/traverse": "^8.0.4",
     "@babel/generator": "^8.0.0",
     "@babel/types": "^8.0.4"
-  }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "bin",
+    "src"
+  ]
 }

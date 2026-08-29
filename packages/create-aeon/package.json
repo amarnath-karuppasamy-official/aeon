@@ -1,0 +1,9 @@
+{
+  "name": "create-aeon",
+  "version": "0.1.0",
+  "description": "Scaffold a new Aeon app: npm create aeon@latest my-app",
+  "type": "module",
+  "bin": { "create-aeon": "./bin/create-aeon.mjs" },
+  "files": ["bin", "template"],
+  "publishConfig": { "access": "public" }
+}
