@@ -11,9 +11,15 @@
     "@aeon-framework/core": "^0.1.0",
     "@aeon-framework/router": "^0.1.0",
     "@aeon-framework/forms": "^0.1.0",
-    "@aeon-framework/di": "^0.1.0"
+    "@aeon-framework/di": "^0.1.0",
+    "@aeon-framework/http": "^0.1.0",
+    "@aeon-framework/i18n": "^0.1.0",
+    "@aeon-framework/animate": "^0.1.0",
+    "@aeon-framework/devtools": "^0.1.0",
+    "@aeon-framework/ssr": "^0.1.1"
   },
   "devDependencies": {
-    "@aeon-framework/cli": "^0.1.0"
+    "@aeon-framework/cli": "^0.1.0",
+    "@aeon-framework/testing": "^0.1.0"
   }
 }

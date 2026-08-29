@@ -119,6 +119,16 @@ scaffold more than one project and want the `aeon` command on their PATH;
 `main.js`, a `tsconfig.json` included, full type-checking against every
 Aeon package's hand-written `.d.ts`.
 
+Batteries included: the scaffolded `package.json` lists every published Aeon
+package as a dependency (`router`, `forms`, `di`, `http`, `i18n`, `animate`,
+`devtools`, `ssr`, plus `testing` as a dev dependency) — not just the two or
+three the starter's `main.js` happens to import. `npm install` gets you
+everything up front; nothing to add later just to try routing or SSR. The
+starter code itself stays a minimal counter (with a comment listing what's
+already installed and ready to import) rather than demoing all nine, and
+esbuild still tree-shakes the production build down to only what you
+actually `import` — installing the rest costs nothing in bundle size.
+
 If you're working from a clone of this repo instead (e.g. to run the demo
 app or contribute), use the CLI's local entry point:
 
