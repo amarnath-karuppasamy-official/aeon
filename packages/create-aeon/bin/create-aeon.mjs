@@ -10,7 +10,9 @@ import path from 'node:path';
 import fs from 'node:fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const name = process.argv[2];
+const rawArgs = process.argv.slice(2);
+const useTs = rawArgs.includes('--ts');
+const name = rawArgs.find((a) => !a.startsWith('-'));
 
 function log(msg) {
   console.log(`\x1b[36m[create-aeon]\x1b[0m ${msg}`);
@@ -18,14 +20,14 @@ function log(msg) {
 
 if (!name) {
   console.log(`Usage:
-  npm create aeon@latest <name>
-  npx create-aeon <name>
+  npm create aeon@latest <name> [-- --ts]
+  npx create-aeon <name> [--ts]
 `);
   process.exit(1);
 }
 
 const dest = path.resolve(process.cwd(), name);
-const templateDir = path.join(__dirname, '..', 'template');
+const templateDir = path.join(__dirname, '..', useTs ? 'template-ts' : 'template');
 
 if (fs.existsSync(dest)) {
   console.error(`${dest} already exists.`);
@@ -55,5 +57,5 @@ const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
 pkg.name = name;
 fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
 
-log(`created new Aeon app at ${dest}`);
+log(`created new Aeon app at ${dest}${useTs ? ' (TypeScript)' : ''}`);
 log(`next: cd ${name} && npm install && npx aeon dev .`);

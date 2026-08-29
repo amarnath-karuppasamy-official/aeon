@@ -1,6 +1,6 @@
 {
   "name": "@aeon-framework/di",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Aeon dependency injection: tokens, providers, injection — no decorators required.",
   "type": "module",
   "main": "./src/index.js",
@@ -16,5 +16,6 @@
   },
   "files": [
     "src"
-  ]
+  ],
+  "types": "./src/index.d.ts"
 }

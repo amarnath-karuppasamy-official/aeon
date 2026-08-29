@@ -18,13 +18,15 @@ function log(msg) {
 
 function resolveApp(dir) {
   const root = path.resolve(process.cwd(), dir);
-  // .jsx first so an app embedding React (see examples/interop-react) gets
-  // JSX transformed; plain Aeon apps never need it and just use main.js.
-  const candidates = ['main.jsx', 'main.js'].map((f) => path.join(root, 'src', f));
+  // .tsx/.jsx first so an app embedding React (see examples/interop-react)
+  // or written in TypeScript gets the right transform; plain Aeon apps
+  // never need either and just use main.js. esbuild picks the loader from
+  // the extension automatically — no separate "TS mode" to configure.
+  const candidates = ['main.tsx', 'main.ts', 'main.jsx', 'main.js'].map((f) => path.join(root, 'src', f));
   const entry = candidates.find((f) => fs.existsSync(f));
   const html = path.join(root, 'index.html');
   if (!entry) {
-    console.error(`Cannot find src/main.js or src/main.jsx under ${root}.`);
+    console.error(`Cannot find src/main.{ts,tsx,js,jsx} under ${root}.`);
     process.exit(1);
   }
   return { root, entry, html };
@@ -73,16 +75,16 @@ async function build(dir) {
   return result;
 }
 
-function scaffold(name) {
+function scaffold(name, { ts = false } = {}) {
   const dest = path.resolve(process.cwd(), name);
-  const templateDir = path.join(__dirname, '..', 'template');
+  const templateDir = path.join(__dirname, '..', ts ? 'template-ts' : 'template');
   if (fs.existsSync(dest)) {
     console.error(`${dest} already exists.`);
     process.exit(1);
   }
   fs.mkdirSync(dest, { recursive: true });
   copyRecursive(templateDir, dest);
-  log(`created new Aeon app at ${dest}`);
+  log(`created new Aeon app at ${dest}${ts ? ' (TypeScript)' : ''}`);
   log(`next: cd ${name} && npm install && npx aeon dev .`);
 }
 
@@ -130,17 +132,17 @@ function help() {
   console.log(`Aeon CLI
 
 Usage:
-  aeon new <name>       Scaffold a new Aeon app
-  aeon dev [dir]         Start the dev server (default: current directory)
-  aeon build [dir]       Production build to dist/
-  aeon migrate <file>    Best-effort React -> Aeon codemod (needs @aeon-framework/migrate installed)
+  aeon new <name> [--ts]  Scaffold a new Aeon app (add --ts for the TypeScript starter)
+  aeon dev [dir]          Start the dev server (default: current directory)
+  aeon build [dir]        Production build to dist/
+  aeon migrate <file>     Best-effort React -> Aeon codemod (needs @aeon-framework/migrate installed)
 `);
 }
 
 switch (cmd) {
   case 'new':
     if (!args[1]) { help(); process.exit(1); }
-    scaffold(args[1]);
+    scaffold(args[1], { ts: args.includes('--ts') });
     break;
   case 'dev':
     await dev(target);

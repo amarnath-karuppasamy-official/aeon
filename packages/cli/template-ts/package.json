@@ -1,0 +1,21 @@
+{
+  "name": "my-aeon-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "aeon dev .",
+    "build": "aeon build .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aeon-framework/core": "^0.1.0",
+    "@aeon-framework/router": "^0.1.0",
+    "@aeon-framework/forms": "^0.1.0",
+    "@aeon-framework/di": "^0.1.0"
+  },
+  "devDependencies": {
+    "@aeon-framework/cli": "^0.1.0",
+    "typescript": "^5.5.0"
+  }
+}

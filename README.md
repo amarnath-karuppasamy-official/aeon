@@ -83,6 +83,11 @@ npm run portability-check    # signals work with zero DOM, checked on Node + Bun
 | `@aeon-framework/cli` | `aeon new / dev / build / migrate` — esbuild-powered, zero config |
 | `@aeon-framework/interop` | Embed Aeon inside React/Vue (and vice versa) — `AeonView`, `useAeonSignal` |
 | `@aeon-framework/migrate` | Codemod: converts a defined subset of React function components to Aeon |
+| `@aeon-framework/http` | `resource()` (reactive fetch), `mutation()` (imperative actions), plain `http.*` fetch helpers |
+| `@aeon-framework/testing` | `render()`/`fireEvent`/`cleanup()` — mount a component into a real (Happy DOM) document and test it |
+| `create-aeon` | `npm create aeon@latest my-app` — the zero-install scaffolder |
+
+Every package ships hand-written `.d.ts` declarations — TypeScript projects get full autocomplete and type-checking with no separate `@types/*` package, and no build step generates them (they're maintained by hand alongside the JS, and verified against real `tsc` runs, not just eyeballed).
 
 ## Quickstart
 
@@ -104,7 +109,11 @@ npm create aeon@latest my-app
 
 Both produce the identical starter app — `aeon new` is for people who'll
 scaffold more than one project and want the `aeon` command on their PATH;
-`npm create aeon` is for a one-off with nothing to install afterward.
+`npm create aeon` is for a one-off with nothing to install afterward. Add
+`--ts` to either for the TypeScript starter (`aeon new my-app --ts`, or
+`npm create aeon@latest my-app -- --ts`) — same app, `main.ts` instead of
+`main.js`, a `tsconfig.json` included, full type-checking against every
+Aeon package's hand-written `.d.ts`.
 
 If you're working from a clone of this repo instead (e.g. to run the demo
 app or contribute), use the CLI's local entry point:
@@ -184,6 +193,56 @@ provide(Logger, () => ({ log: (msg) => console.log(msg) }));
 
 // anywhere downstream:
 const logger = inject(Logger);
+```
+
+## HTTP
+
+Angular's `HttpClient` returns Observables; Aeon's `@aeon-framework/http`
+returns signals instead, so a fetch fits the same `${() => ...}` binding
+style as everything else. Two primitives cover the two shapes of network
+calls — reactive reads and imperative actions:
+
+```js
+import { resource, mutation, http } from '@aeon-framework/http';
+
+// resource(): re-fetches whenever the source changes. A null/undefined/false
+// source skips fetching — the standard "don't fetch until we have an id" guard.
+const user = resource(() => userId.value, (id) => http.get(`/api/users/${id}`));
+// user.data / user.loading / user.error are all signals — bind them directly.
+// A superseded request (source changed again before the first resolved) is
+// aborted and its result discarded, so `data` never flickers back to stale.
+
+// mutation(): triggered by calling run(), not by a signal changing — the
+// right shape for a form submit or a delete button.
+const createUser = mutation((payload) => http.post('/api/users', payload));
+await createUser.run({ name: 'Ada' }); // createUser.data / .loading / .error track it
+```
+
+`http.get/post/put/patch/del` are plain `fetch` wrappers with no signals
+involved — JSON in, JSON out, a thrown `HttpError` (with `.status`) on a
+non-2xx response — use them directly, or as the building blocks the two
+primitives above are made of.
+
+## Testing
+
+`@aeon-framework/testing` mounts a component into a real document (Happy
+DOM, not a mock) and gives you Testing-Library-style helpers. Aeon's signal
+writes apply synchronously — no virtual-DOM diff to flush — so assertions
+run immediately after an interaction, no `await tick()` needed:
+
+```js
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { render, fireEvent, cleanup } from '@aeon-framework/testing';
+import { Counter } from './counter.js';
+
+test.afterEach(() => cleanup());
+
+test('clicking +1 increments the count', async () => {
+  const { find } = await render(Counter);
+  fireEvent.click(find('#inc'));
+  assert.equal(find('#count').textContent, '1');
+});
 ```
 
 ## Interop — using Aeon alongside another framework
@@ -341,14 +400,26 @@ validation all confirmed working end to end):
   (`benchmark/*`), including two real bugs the benchmark caught and fixed
   (see "Performance" above) — Aeon now sits in the same tier as
   React/Preact/Vue on this benchmark, behind Solid
+- Hand-written `.d.ts` types for every package, verified against real `tsc`
+  runs (not just eyeballed) — plus a `--ts` starter (`aeon new my-app --ts`)
+- `@aeon-framework/http`: `resource()`/`mutation()`, tested including the
+  stale-request race (a slow first response can't overwrite a faster later
+  one) and a real 404 surfaced as `HttpError`
+- `@aeon-framework/testing`: mounts into a real (Happy DOM) document,
+  Testing-Library-style `render()`/`fireEvent`/`cleanup()`
+- Arbitrary npm package compatibility checked, not assumed: axios (CJS/dual
+  package), dayjs (UMD), lodash-es (ESM), zod, and nanoid were installed
+  into a scaffolded app and built/run through the CLI with zero
+  configuration — esbuild's bundling already handles CJS/ESM/dual-package
+  interop, so `npm install <anything>` in an Aeon app is expected to just
+  work the same way it does in any esbuild-based project
 
 Not yet built — the honest gap list for anything claiming to seriously
 compete with Angular: SSR/hydration, a real compiler (current templates are
-tagged-literal + runtime-parsed, not compile-time optimized), TypeScript
-types, animations, HTTP client, CLI code generators, testing utilities,
-devtools, i18n, a migration codemod that covers more than the current
-`useState`-only subset, and — the actually hard part — an ecosystem and
-community.
+tagged-literal + runtime-parsed, not compile-time optimized), animations,
+CLI code generators (component/service scaffolding beyond `new`), devtools,
+i18n, a migration codemod that covers more than the current `useState`-only
+subset, and — the actually hard part — an ecosystem and community.
 
 The architecture here (signals, no vdom, plain functions over decorators) is
 a defensible bet on where the frameworks are heading; the distance to
@@ -363,9 +434,12 @@ packages/
   router/   client-side routing
   forms/    reactive forms
   di/       dependency injection
-  cli/      scaffold, dev server, build/migrate (+ starter template/)
+  cli/      scaffold, dev server, build/migrate (+ template/ and template-ts/)
   interop/  embed Aeon in React/Vue and vice versa
   migrate/  React → Aeon codemod (Babel-based)
+  http/     resource()/mutation() — signals over fetch
+  testing/  render()/fireEvent/cleanup() on a real (Happy DOM) document
+  create-aeon/  npm create aeon@latest — zero-install scaffolder
 examples/
   demo-app/           exercises every package together
   minimal-app/         the counter used for size measurements

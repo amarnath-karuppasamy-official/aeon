@@ -1,6 +1,6 @@
 {
   "name": "@aeon-framework/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Aeon CLI: scaffold, dev server, and production build powered by esbuild.",
   "type": "module",
   "bin": {
@@ -17,6 +17,7 @@
   },
   "files": [
     "bin",
-    "template"
+    "template",
+    "template-ts"
   ]
 }

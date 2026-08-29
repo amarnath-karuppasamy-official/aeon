@@ -1,0 +1,14 @@
+{
+  "name": "@aeon-framework/http",
+  "version": "0.1.0",
+  "description": "Aeon HTTP: fetch wrapped in signals — resource() for reactive data, mutation() for imperative actions, plus plain fetch helpers.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": { ".": "./src/index.js" },
+  "types": "./src/index.d.ts",
+  "sideEffects": false,
+  "engines": { "node": ">=18" },
+  "files": ["src"],
+  "publishConfig": { "access": "public" },
+  "dependencies": { "@aeon-framework/core": "^0.1.0" }
+}

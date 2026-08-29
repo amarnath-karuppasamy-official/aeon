@@ -1,6 +1,6 @@
 {
   "name": "@aeon-framework/forms",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Aeon forms: signal-backed controls and groups with composable validators.",
   "type": "module",
   "main": "./src/index.js",
@@ -19,5 +19,6 @@
   },
   "files": [
     "src"
-  ]
+  ],
+  "types": "./src/index.d.ts"
 }
