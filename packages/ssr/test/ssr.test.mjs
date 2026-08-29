@@ -64,3 +64,38 @@ test('SSR HTML hydrates without recreating nodes and stays interactive', async (
   dispose();
   container.remove();
 });
+
+// Regression test for a real bug found while dogfooding this package for a
+// per-request SSR server: renderToString()'s window used to default to
+// Happy DOM's `about:blank`, which has a null origin. @aeon-framework/router's
+// navigate() drives window.history.pushState()/replaceState() to resolve
+// the route matching the incoming request URL before rendering — the
+// standard "SSR this specific URL" pattern — and pushState() throws a
+// SecurityError against a null-origin document. ensureDom() now installs
+// the window with a real origin (http://localhost/) precisely so this works
+// out of the box.
+test('renderToString() + router.navigate() can server-render whatever route matches the request URL', async () => {
+  const { createRouter, outlet } = await import('@aeon-framework/router');
+  const { html } = await import('@aeon-framework/core');
+
+  function Home() {
+    return html`<h1>Home</h1>`;
+  }
+  function About() {
+    return html`<h1>About</h1>`;
+  }
+  const router = createRouter([
+    { path: '/', component: Home },
+    { path: '/about', component: About },
+  ]);
+  function App() {
+    return html`<main>${() => outlet(router)}</main>`;
+  }
+
+  // This is the part that used to throw SecurityError before the fix.
+  assert.doesNotThrow(() => router.navigate('/about', { replace: true }));
+
+  const out = renderToString(App);
+  assert.match(out, /<h1>About<\/h1>/);
+  assert.doesNotMatch(out, /<h1>Home<\/h1>/);
+});

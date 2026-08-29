@@ -293,6 +293,32 @@ per-row marker, handling reordering, etc.) is a meaningfully larger problem
 that's called out in "What's real vs. what's next" below instead of being
 half-solved here.
 
+**Per-request SSR with the router.** `renderToString()`'s Happy DOM window is
+installed with a real origin (`http://localhost/`), not Happy DOM's default
+`about:blank`. That matters if you combine SSR with `@aeon-framework/router`:
+the standard "render whatever route matches this request" pattern is to call
+`router.navigate(req.url, { replace: true })` and then `renderToString(App)`,
+and `navigate()` drives `window.history.pushState()`/`replaceState()` under
+the hood — which throws a `SecurityError` against a null-origin document. A
+real `http://localhost/` origin is what makes that work out of the box:
+
+```js
+// server.js — render whatever route matches the incoming request
+import { renderToString } from '@aeon-framework/ssr';
+import { router } from './router.js';
+import { App } from './app.js';
+
+function handleRequest(req, res) {
+  router.navigate(req.url, { replace: true });
+  const html = renderToString(App); // renders the route that just matched
+  // ...embed `html` in your page shell and send the response
+}
+```
+
+Covered by `packages/ssr/test/ssr.test.mjs`, which asserts `router.navigate()`
+before `renderToString()` doesn't throw and that the resulting HTML matches
+the navigated-to route, not whatever route the router started on.
+
 ## Animate
 
 `@aeon-framework/animate` drives enter/leave transitions with a class

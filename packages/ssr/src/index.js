@@ -21,7 +21,14 @@ let installedWindow = null;
 
 function ensureDom() {
   if (installedWindow) return;
-  const window = new Window();
+  // A real origin, not Happy DOM's default `about:blank` — @aeon-framework/router's
+  // navigate() drives window.history.pushState()/replaceState() to resolve a
+  // route before renderToString() runs (the standard pattern for per-request
+  // SSR routing: call router.navigate(req.url) then renderToString(App)).
+  // history.pushState() throws a SecurityError against `about:blank`'s null
+  // origin, so every consumer doing per-request SSR would otherwise have to
+  // work around this the same way — fixed once, here, instead.
+  const window = new Window({ url: 'http://localhost/' });
   installedWindow = window;
   globalThis.window = window;
   globalThis.document = window.document;
