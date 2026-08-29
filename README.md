@@ -76,15 +76,19 @@ npm run portability-check    # signals work with zero DOM, checked on Node + Bun
 
 | Package | What it does |
 |---|---|
-| `@aeon-framework/core` | `signal`, `computed`, `effect`, `batch`, the `html` template tag, `render`, `list` (keyed lists), `mount`, `onMount`/`onCleanup` |
+| `@aeon-framework/core` | `signal`, `computed`, `effect`, `batch`, the `html` template tag, `render`, `list` (keyed lists), `mount`, `hydrate`/`hydrateComponent`, `onMount`/`onCleanup` |
 | `@aeon-framework/router` | `createRouter`, hash or history mode, params, `outlet`, `link` |
 | `@aeon-framework/forms` | `control`, `group`, composable `validators` |
 | `@aeon-framework/di` | `createToken`, `provide`, `inject`, scoped `Container` |
-| `@aeon-framework/cli` | `aeon new / dev / build / migrate` — esbuild-powered, zero config |
+| `@aeon-framework/cli` | `aeon new / dev / build / migrate / generate` (alias `g`) — esbuild-powered, zero config |
 | `@aeon-framework/interop` | Embed Aeon inside React/Vue (and vice versa) — `AeonView`, `useAeonSignal` |
 | `@aeon-framework/migrate` | Codemod: converts a defined subset of React function components to Aeon |
 | `@aeon-framework/http` | `resource()` (reactive fetch), `mutation()` (imperative actions), plain `http.*` fetch helpers |
 | `@aeon-framework/testing` | `render()`/`fireEvent`/`cleanup()` — mount a component into a real (Happy DOM) document and test it |
+| `@aeon-framework/ssr` | `renderToString()` — server-render a component/template to an HTML string using the real client renderer, no parallel string renderer |
+| `@aeon-framework/animate` | `transition()` / `animatedList()` — signal-driven enter/leave transitions, including animated list-row removal |
+| `@aeon-framework/i18n` | `locale` signal, `t(key, params)` interpolation + pluralization, `loadMessages()`, fallback locale chain |
+| `@aeon-framework/devtools` | `attachDevtools()` / `mountDevtoolsOverlay()` — an in-page (not a browser extension) live signal inspector |
 | `create-aeon` | `npm create aeon@latest my-app` — the zero-install scaffolder |
 
 Every package ships hand-written `.d.ts` declarations — TypeScript projects get full autocomplete and type-checking with no separate `@types/*` package, and no build step generates them (they're maintained by hand alongside the JS, and verified against real `tsc` runs, not just eyeballed).
@@ -244,6 +248,156 @@ test('clicking +1 increments the count', async () => {
   assert.equal(find('#count').textContent, '1');
 });
 ```
+
+## SSR + hydration
+
+`@aeon-framework/ssr`'s `renderToString()` does not hand-roll a second,
+parallel string renderer — it runs the exact same `mount()`/`render()` code
+from `@aeon-framework/core` against a headless Happy DOM document and
+serializes the result. Server output and client output come from the same
+code path by construction; they can't drift apart the way a template-string
+SSR renderer and a DOM renderer can.
+
+```js
+import { renderToString } from '@aeon-framework/ssr';
+import { hydrateComponent } from '@aeon-framework/core';
+
+// on the server:
+const html = renderToString(Counter); // put this inside your response's mount-point element
+
+// on the client, once the browser has parsed that HTML into the DOM:
+hydrateComponent(Counter, document.getElementById('app'));
+```
+
+`hydrate()`/`hydrateComponent()` (in `@aeon-framework/core`) **adopt** the
+existing server-rendered DOM instead of clearing the container and
+re-rendering — attribute/property/boolean bindings are (re-)applied in
+place, event listeners are attached (server HTML obviously can't carry
+them), and node-part text/element content is adopted by reference. A
+before/after node-identity check is exactly what
+`packages/ssr/test/ssr.test.mjs` and `packages/core/test/hydrate.test.mjs`
+verify — not just "the DOM looks right afterward," but that the same DOM
+nodes survived hydration and a listener attached during hydration actually
+fires and updates a signal-bound text node.
+
+**Disclosed limitation — list hydration flashes once.** A `list()`-bound
+region has no per-row marker to resync against (only the anchor for the
+list *as a whole*), so hydrating one clears the server-rendered rows and
+does one ordinary client-side `list()` render in their place — a one-time
+flash limited to that region. Everything else (including a *nested*
+`html` template used as a node-part's value, e.g. `${() => cond() ?
+html\`<b>A</b>\` : html\`<i>B</i>\`}`) hydrates without recreating a node.
+This is a real, deliberate scope cut, not an oversight — solving
+non-flashing incremental list hydration (matching each row to a stable
+per-row marker, handling reordering, etc.) is a meaningfully larger problem
+that's called out in "What's real vs. what's next" below instead of being
+half-solved here.
+
+## Animate
+
+`@aeon-framework/animate` drives enter/leave transitions with a class
+toggle plus a **deterministic timeout fallback** — it never depends on a
+real CSS `transitionend` actually firing, because Happy DOM (and plenty of
+real-browser edge cases) doesn't fire it reliably. Whichever happens first,
+a real `transitionend` or the configured `duration`, resolves the
+transition — this is what keeps `node --test` runs fast and non-flaky
+instead of hanging on an event that may never come.
+
+```js
+import { transition, animatedList } from '@aeon-framework/animate';
+
+// one element:
+await transition.leave(rowEl, { className: 'row-leave', duration: 200 });
+rowEl.remove(); // only after the transition (or the timeout) resolves
+
+// a whole keyed list of real DOM rows, reactive over a signal:
+const stop = animatedList(listContainer, {
+  items: () => todos.value,
+  key: (t) => t.id,
+  render: (t) => buildRowElement(t), // any real Element
+});
+```
+
+`animatedList()` manages its container's children directly rather than
+going through `@aeon-framework/core`'s `list()` — `list()` removes a
+departing row's DOM synchronously by design (that's what gives it its
+no-flash-elsewhere guarantee elsewhere in a template), so animated removal
+needed its own small reconciler rather than trying to retrofit a "wait
+before removing" hook into core's. `packages/animate/test/animate.test.mjs`
+proves a removed row visibly stays in the DOM through its leave window and
+is only actually removed afterward — not just that the API resolves.
+
+## i18n
+
+```js
+import { locale, t, loadMessages } from '@aeon-framework/i18n';
+
+loadMessages('en', { greeting: 'Hello, {name}!', apples_one: '{count} apple', apples_other: '{count} apples' });
+loadMessages('fr', { greeting: 'Bonjour, {name} !' });
+
+t('greeting', { name: 'Ada' });        // "Hello, Ada!"
+t('apples', { count: 1 });             // "1 apple"  (key_one / key_other convention)
+locale.value = 'fr';
+t('greeting', { name: 'Ada' });        // "Bonjour, Ada !" — reactive: any effect/template
+                                        // reading t() re-runs when locale changes, same as
+                                        // any other signal read
+```
+
+`locale` is a plain signal, so `${() => t('greeting', { name })}` inside a
+template is just an ordinary reactive binding — no separate i18n context or
+re-render mechanism. Missing-key resolution walks a real fallback chain:
+current locale → the configured `fallbackLocale` (default `'en'`) → the raw
+key itself, so a missing translation is visibly a missing translation rather
+than a blank string. `createI18n({ locale, fallbackLocale })` gives you an
+isolated instance (used by the package's own tests); most apps just use the
+default singleton shown above.
+
+## CLI generators
+
+```sh
+aeon generate component UserCard   # writes src/components/UserCard.js
+aeon generate service Billing      # writes src/services/billing.js
+aeon generate route Settings       # writes src/routes/Settings.js
+aeon g component UserCard          # same thing — "g" is an alias for "generate"
+```
+
+Each generator scaffolds a real, syntactically valid file using the same
+shape real Aeon code already uses in this repo: a component is
+`defineComponent(() => html\`...\`)` (matching `packages/core`'s own
+convention for the wrapper), a service is a `createToken()` +
+`create*Service()` factory pair (matching
+`examples/demo-app/src/services/greeting.js`), and a route is a page
+component plus a `{ path, component }` object in the shape
+`@aeon-framework/router`'s `createRouter()` expects (matching
+`examples/demo-app/src/main.js`'s route table). The scaffolding logic lives
+in `packages/cli/src/generate.mjs` as plain, filesystem-free functions
+precisely so it can be unit tested directly, in addition to an end-to-end
+test (`packages/cli/test/cli-generate.test.mjs`) that shells out to the real
+`aeon` binary against a temp directory and asserts the generated file
+exists and its content matches.
+
+## Devtools
+
+`@aeon-framework/devtools` is an **in-page debug overlay** — a small,
+fixed-position panel you mount into your own app's DOM during development.
+It is **not a browser extension**; there is no separate DevTools panel
+integration (see "What's real vs. what's next" for that gap). Aeon signals
+carry no name/introspection metadata of their own, so a component author
+opts a signal into visibility explicitly:
+
+```js
+import { attachDevtools } from '@aeon-framework/devtools';
+
+const devtools = attachDevtools({ hotkey: 'F2' }); // mounted hidden into document.body
+devtools.registry.track('todoCount', todoCount);   // any Aeon signal
+// press F2 in the running app to toggle the panel
+```
+
+The panel is an ordinary Aeon component under the hood (`html`/`list`/
+`mount`, the same renderer as the rest of the framework) — each tracked
+row updates through a plain reactive binding, no polling. Untrack with
+`devtools.registry.untrack(name)`; `devtools.destroy()` removes the overlay
+and stops listening for the hotkey entirely.
 
 ## Interop — using Aeon alongside another framework
 
@@ -413,13 +567,43 @@ validation all confirmed working end to end):
   configuration — esbuild's bundling already handles CJS/ESM/dual-package
   interop, so `npm install <anything>` in an Aeon app is expected to just
   work the same way it does in any esbuild-based project
+- `@aeon-framework/ssr`: `renderToString()` runs the real `mount()`/`render()`
+  renderer against a headless Happy DOM document (no parallel string
+  renderer) — tested end to end against `@aeon-framework/core`'s new
+  `hydrate()`/`hydrateComponent()`, including a node-identity check (adopted
+  DOM isn't recreated) and a click listener attached during hydration that
+  actually fires and updates a signal-bound text node
+- `@aeon-framework/core`: `hydrate()`/`hydrateComponent()` adopt existing
+  (e.g. server-rendered) DOM for attribute/property/event bindings and node
+  content, including nested `html` templates used as node-part values —
+  `list()`-bound regions are the one disclosed exception (one-time flash,
+  see "SSR + hydration" above)
+- `@aeon-framework/animate`: `transition()`/`animatedList()` — enter/leave
+  transitions with a deterministic transitionend-or-timeout resolution,
+  tested with real (short) timers proving a removed row stays in the DOM
+  through its leave window and is only removed afterward
+- `@aeon-framework/i18n`: reactive `locale` signal, `t()` interpolation +
+  `count`-driven pluralization, `loadMessages()`, and a real fallback-locale
+  chain — tested including a `t()` call inside an `effect()` that re-runs
+  when `locale` changes
+- CLI generators: `aeon generate component|service|route <Name>` (alias
+  `aeon g`), scaffolding real files in the shapes already used elsewhere in
+  this repo — tested both as pure functions and end-to-end via the actual
+  `aeon` binary against a temp directory
+- `@aeon-framework/devtools`: an in-page (not a browser extension) live
+  signal overlay — `attachDevtools()`/`mountDevtoolsOverlay()` plus a
+  `track()`/`untrack()` registry, tested with Happy DOM confirming the
+  panel's DOM text updates when a tracked signal's value changes
 
 Not yet built — the honest gap list for anything claiming to seriously
-compete with Angular: SSR/hydration, a real compiler (current templates are
-tagged-literal + runtime-parsed, not compile-time optimized), animations,
-CLI code generators (component/service scaffolding beyond `new`), devtools,
-i18n, a migration codemod that covers more than the current `useState`-only
-subset, and — the actually hard part — an ecosystem and community.
+compete with Angular: a real compiler (current templates are tagged-literal
++ runtime-parsed, not compile-time optimized), non-flashing incremental
+list hydration (SSR/hydration itself is now built — see above — but a
+`list()`-bound region still falls back to one client-side re-render), a
+real Chrome DevTools *extension* (`@aeon-framework/devtools` is an in-page
+overlay only, not a panel integrated into the browser's own DevTools), a
+migration codemod that covers more than the current `useState`-only subset,
+and — the actually hard part — an ecosystem and community.
 
 The architecture here (signals, no vdom, plain functions over decorators) is
 a defensible bet on where the frameworks are heading; the distance to
@@ -439,6 +623,10 @@ packages/
   migrate/  React → Aeon codemod (Babel-based)
   http/     resource()/mutation() — signals over fetch
   testing/  render()/fireEvent/cleanup() on a real (Happy DOM) document
+  ssr/      renderToString() — server-render with the real client renderer
+  animate/  transition()/animatedList() — enter/leave transitions
+  i18n/     locale signal, t()/loadMessages(), fallback locale chain
+  devtools/ in-page live signal overlay (not a browser extension)
   create-aeon/  npm create aeon@latest — zero-install scaffolder
 examples/
   demo-app/           exercises every package together

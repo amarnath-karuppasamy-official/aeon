@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
 import esbuild from 'esbuild';
+import { generators } from '../src/generate.mjs';
 
 const args = process.argv.slice(2);
 const cmd = args[0];
@@ -128,14 +129,42 @@ async function migrateFile(file) {
   log(`wrote ${outFile} — your original file is untouched.`);
 }
 
+/**
+ * `aeon generate <kind> <Name>` / `aeon g <kind> <Name>` — scaffold a real
+ * file into the conventional location (src/components, src/services,
+ * src/routes) using generate.mjs's pure generator functions. Refuses to
+ * overwrite an existing file, same as `aeon new`.
+ */
+function generate(kind, name, cwd = '.') {
+  const generator = generators[kind];
+  if (!generator || !name) {
+    console.error(`Usage: aeon generate <component|service|route> <Name>\n  (alias: aeon g <component|service|route> <Name>)`);
+    process.exit(1);
+  }
+  const root = path.resolve(process.cwd(), cwd);
+  const { relativePath, content, name: generatedName } = generator(name);
+  const dest = path.join(root, relativePath);
+  if (fs.existsSync(dest)) {
+    console.error(`${dest} already exists.`);
+    process.exit(1);
+  }
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.writeFileSync(dest, content);
+  log(`generated ${kind} ${generatedName} -> ${path.relative(root, dest)}`);
+  return dest;
+}
+
 function help() {
   console.log(`Aeon CLI
 
 Usage:
-  aeon new <name> [--ts]  Scaffold a new Aeon app (add --ts for the TypeScript starter)
-  aeon dev [dir]          Start the dev server (default: current directory)
-  aeon build [dir]        Production build to dist/
-  aeon migrate <file>     Best-effort React -> Aeon codemod (needs @aeon-framework/migrate installed)
+  aeon new <name> [--ts]           Scaffold a new Aeon app (add --ts for the TypeScript starter)
+  aeon dev [dir]                   Start the dev server (default: current directory)
+  aeon build [dir]                 Production build to dist/
+  aeon migrate <file>               Best-effort React -> Aeon codemod (needs @aeon-framework/migrate installed)
+  aeon generate component <Name>   Scaffold src/components/<Name>.js (alias: aeon g component <Name>)
+  aeon generate service <Name>     Scaffold src/services/<name>.js (alias: aeon g service <Name>)
+  aeon generate route <Name>       Scaffold src/routes/<Name>.js (alias: aeon g route <Name>)
 `);
 }
 
@@ -152,6 +181,10 @@ switch (cmd) {
     break;
   case 'migrate':
     await migrateFile(args[1]);
+    break;
+  case 'generate':
+  case 'g':
+    generate(args[1], args[2]);
     break;
   default:
     help();

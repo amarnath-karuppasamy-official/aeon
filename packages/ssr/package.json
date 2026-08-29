@@ -1,0 +1,15 @@
+{
+  "name": "@aeon-framework/ssr",
+  "version": "0.1.0",
+  "description": "Aeon SSR: render a component/template to an HTML string with the real client renderer (Happy DOM under the hood, no parallel string renderer), plus hydrate() on the client to adopt it.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": { ".": "./src/index.js" },
+  "types": "./src/index.d.ts",
+  "sideEffects": false,
+  "engines": { "node": ">=18" },
+  "files": ["src"],
+  "publishConfig": { "access": "public" },
+  "dependencies": { "happy-dom": "^20.0.0" },
+  "peerDependencies": { "@aeon-framework/core": "^0.1.0" }
+}

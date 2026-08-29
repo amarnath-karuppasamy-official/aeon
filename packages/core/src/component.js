@@ -1,7 +1,7 @@
 // Aeon component model: plain functions that return templates, with lifecycle
 // hooks scoped via an owner stack (no classes, no decorators required).
 import { effect } from './signal.js';
-import { render } from './dom.js';
+import { render, hydrate } from './dom.js';
 
 let ownerStack = [];
 
@@ -48,4 +48,27 @@ export function mount(componentFn, container, props = {}) {
  *  and future compile-time optimization hooks. */
 export function defineComponent(setupFn) {
   return setupFn;
+}
+
+/**
+ * Like `mount()`, but adopts existing (e.g. server-rendered) DOM under
+ * `container` instead of clearing and re-rendering it — the component-level
+ * counterpart to `hydrate()`. `componentFn(props)` must return the SAME
+ * template shape that produced `container`'s current markup.
+ */
+export function hydrateComponent(componentFn, container, props = {}) {
+  const owner = { cleanups: [], mounts: [] };
+  ownerStack.push(owner);
+  let template;
+  try {
+    template = componentFn(props);
+  } finally {
+    ownerStack.pop();
+  }
+  const disposeDom = hydrate(template, container);
+  for (const m of owner.mounts) m();
+  return () => {
+    for (const c of owner.cleanups) c();
+    disposeDom();
+  };
 }

@@ -1,0 +1,15 @@
+{
+  "name": "@aeon-framework/devtools",
+  "version": "0.1.0",
+  "description": "Aeon devtools: a dev-only in-page debug overlay (not a browser extension) that lists live signal values, updating in real time — component authors opt signals in via devtools.track(name, signal).",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": { ".": "./src/index.js" },
+  "types": "./src/index.d.ts",
+  "sideEffects": false,
+  "engines": { "node": ">=18" },
+  "files": ["src"],
+  "publishConfig": { "access": "public" },
+  "dependencies": { "@aeon-framework/core": "^0.1.0" },
+  "devDependencies": { "@aeon-framework/testing": "^0.1.0", "happy-dom": "^20.0.0" }
+}

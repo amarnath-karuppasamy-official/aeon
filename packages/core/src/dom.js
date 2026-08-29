@@ -242,6 +242,180 @@ function mount(result, disposers) {
   return { fragment, parts };
 }
 
+// ---------------------------------------------------------------------------
+// Hydration: adopt server-rendered DOM instead of clearing + re-rendering.
+//
+// The comment markers `<!--aeon:N aeon-->` that `compile()` emits for every
+// node-kind binding are never stripped or mutated by the renderer (only
+// bind *attributes* get stripped, from the cached `<template>`, on first
+// compile) — so the exact same marker text survives serialization to an
+// HTML string and back through the parser. Hydration exploits that: it walks
+// the *compiled template* (which still has those markers, plus the original
+// child-index structure `walkForParts` used to record every binding's path)
+// in lockstep with the *live, already-populated* DOM tree, using each
+// marker comment as a resync point. Whatever nodes sit between two markers
+// in the live tree are the previous render's actual output for that part —
+// they're adopted by reference (assigned into the NodePart, never recreated)
+// rather than thrown away and rebuilt.
+//
+// Known, disclosed limitation: a `list()`-bound region cannot be hydrated
+// incrementally with this scheme (there is no per-row marker to key off of,
+// only whatever the row templates themselves render), so hydrating a list
+// falls back to clearing the server-rendered rows and doing one normal
+// client-side `list()` render in their place — a one-time flash limited to
+// list regions. Everything else (attributes, properties, event listeners,
+// plain text/element node content, and even nested `html` templates used as
+// node-part values) hydrates without recreating a single DOM node.
+// ---------------------------------------------------------------------------
+
+function buildDescriptorMap(partDescriptors) {
+  const map = new Map();
+  for (const d of partDescriptors) {
+    const key = d.path.join('.');
+    let arr = map.get(key);
+    if (!arr) map.set(key, (arr = []));
+    arr.push(d);
+  }
+  return map;
+}
+
+/**
+ * Walk the compiled template's static structure and the live DOM in
+ * lockstep, resolving each binding to its real DOM counterpart. `lParent`
+ * only needs to expose `childNodes` (a real Node, or `{ childNodes: [...] }`
+ * for the synthetic "children of a node-part" case used when recursing into
+ * an adopted nested template).
+ */
+function hydrateChildren(tParent, lParent, path, descByPath, bindings) {
+  const tChildren = tParent.childNodes;
+  let li = 0;
+  for (let ti = 0; ti < tChildren.length; ti++) {
+    const tChild = tChildren[ti];
+    const curPath = [...path, ti];
+
+    if (tChild.nodeType === 8) {
+      const m = bindTokenRe.exec(tChild.data);
+      if (m) {
+        // Node-part anchor: everything in the live tree from here up to (not
+        // including) the matching marker comment is this part's prior output.
+        const contentNodes = [];
+        let lc = lParent.childNodes[li];
+        while (lc && !(lc.nodeType === 8 && lc.data === tChild.data)) {
+          contentNodes.push(lc);
+          li++;
+          lc = lParent.childNodes[li];
+        }
+        bindings.push({ path: curPath, index: Number(m[1]), kind: 'node', anchorLive: lc, contentNodes });
+        if (lc) li++; // step past the anchor itself
+        continue;
+      }
+    }
+
+    if (tChild.nodeType === 1) {
+      const lChild = lParent.childNodes[li];
+      const descs = descByPath.get(curPath.join('.'));
+      if (descs && lChild) for (const d of descs) bindings.push({ ...d, domNode: lChild });
+      if (lChild) hydrateChildren(tChild, lChild, curPath, descByPath, bindings);
+      li++;
+      continue;
+    }
+
+    // Static text or a plain (non-binding) comment: one live node consumed, no binding.
+    li++;
+  }
+}
+
+/** Adopt (or, for lists, fall back to freshly rendering) a node-part's initial value. */
+function adoptNodePart(part, value, contentNodes) {
+  if (value && value.__aeonList) {
+    // Documented list-hydration limitation: no stable per-row hydration
+    // anchors exist yet, so drop the server-rendered rows and do one normal
+    // client render — a disclosed, one-time flash for this region only.
+    for (const n of contentNodes) n.remove();
+    part.update(value);
+    return;
+  }
+  if (value && value.__aeonTemplate) {
+    // Nested template (e.g. `${() => cond() ? html`<b>A</b>` : html`<i>B</i>`}`):
+    // recurse the same lockstep walk against its own compiled structure so
+    // ITS bindings (including event listeners) get wired up without
+    // recreating any of these nodes either.
+    part.nodes = contentNodes;
+    hydrateInto(value, { childNodes: contentNodes }, part.nestedDisposers);
+    return;
+  }
+  if (Array.isArray(value) || value instanceof Node) {
+    // Mixed arrays / raw Node values aren't given per-item markers either;
+    // same disclosed fallback as list().
+    for (const n of contentNodes) n.remove();
+    part.update(value);
+    return;
+  }
+  // Plain text/number/etc: the server already rendered the right text node(s) — adopt as-is.
+  part.nodes = contentNodes;
+}
+
+function hydrateInto(result, parentLike, disposers) {
+  const info = getTemplate(result.strings);
+  const descByPath = buildDescriptorMap(info.partDescriptors);
+  const bindings = [];
+  hydrateChildren(info.template.content, parentLike, [], descByPath, bindings);
+
+  for (const b of bindings) {
+    const raw = result.values[b.index];
+    if (b.kind === 'node') {
+      if (!b.anchorLive) continue; // malformed/truncated markup — nothing safe to hydrate here
+      const part = new NodePart(b.anchorLive);
+      if (typeof raw === 'function') {
+        let first = true;
+        disposers.push(
+          effect(() => {
+            const v = raw();
+            if (first) {
+              first = false;
+              adoptNodePart(part, v, b.contentNodes);
+            } else {
+              part.update(v);
+            }
+          })
+        );
+      } else {
+        adoptNodePart(part, raw, b.contentNodes);
+      }
+    } else {
+      const part = new AttrPart(b.domNode, b.name, b.kind);
+      if (part.kind === 'event') {
+        // Server-rendered markup can never carry listeners — always attach.
+        part.update(raw);
+      } else if (typeof raw === 'function') {
+        disposers.push(effect(() => part.update(raw())));
+      } else {
+        part.update(raw);
+      }
+    }
+  }
+}
+
+/**
+ * Adopt existing server-rendered DOM under `container` instead of clearing
+ * and re-rendering it. `result` is an Aeon template result (the return
+ * value of `html\`...\``, or a component function's return value) that
+ * describes the SAME markup `container` was already populated with (e.g. by
+ * `@aeon-framework/ssr`'s `renderToString`). Returns a dispose function,
+ * same contract as `render()`.
+ *
+ * See the block comment above for the exact adoption rules and the
+ * list-hydration flash limitation.
+ */
+export function hydrate(result, container) {
+  const disposers = [];
+  hydrateInto(result, container, disposers);
+  return () => {
+    for (const d of disposers) d();
+    container.textContent = '';
+  };
+}
+
 /** Render a template result into a container element. Returns a dispose function. */
 export function render(result, container) {
   const disposers = [];

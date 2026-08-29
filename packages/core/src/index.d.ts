@@ -62,6 +62,14 @@ export type Component<P = {}> = (props: P) => TemplateResult | null;
  * function that stops all bindings and clears the container. */
 export function render(result: TemplateResult, container: Element): () => void;
 
+/** Adopt existing (e.g. server-rendered) DOM under `container` instead of
+ * clearing and re-rendering it. `result` must describe the same markup
+ * `container` is already populated with. `list()`-bound regions fall back
+ * to a fresh client render (a disclosed, one-time flash for that region
+ * only) — everything else adopts without recreating a node. Returns a
+ * dispose function, same contract as `render()`. */
+export function hydrate(result: TemplateResult, container: Element): () => void;
+
 /** The special value returned by `list()` — pass it inside a `${...}`
  * binding, wrapped in a function so it re-runs on change:
  *   ${() => list(() => items.value, i => i.id, i => html`<li>${i.text}</li>`)}
@@ -82,6 +90,11 @@ export function list<T>(
 /** Instantiate a component function into `container`. Returns a dispose
  * function that runs registered cleanups and unmounts the DOM. */
 export function mount<P>(componentFn: Component<P>, container: Element, props?: P): () => void;
+
+/** Like `mount()`, but adopts existing (e.g. server-rendered) DOM under
+ * `container` instead of clearing and re-rendering it — the component-level
+ * counterpart to `hydrate()`. */
+export function hydrateComponent<P>(componentFn: Component<P>, container: Element, props?: P): () => void;
 
 /** Identity wrapper kept for API stability and future compile-time hooks. */
 export function defineComponent<P>(setupFn: Component<P>): Component<P>;

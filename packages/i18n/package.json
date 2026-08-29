@@ -1,0 +1,14 @@
+{
+  "name": "@aeon-framework/i18n",
+  "version": "0.1.0",
+  "description": "Aeon i18n: a reactive locale signal, t(key, params) interpolation + count-driven pluralization, JSON message loading, and a fallback locale chain.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": { ".": "./src/index.js" },
+  "types": "./src/index.d.ts",
+  "sideEffects": false,
+  "engines": { "node": ">=18" },
+  "files": ["src"],
+  "publishConfig": { "access": "public" },
+  "dependencies": { "@aeon-framework/core": "^0.1.0" }
+}
