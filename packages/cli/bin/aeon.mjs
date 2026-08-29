@@ -5,6 +5,7 @@
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
+import http from 'node:http';
 import esbuild from 'esbuild';
 import { generators } from '../src/generate.mjs';
 
@@ -33,6 +34,19 @@ function resolveApp(dir) {
   return { root, entry, html };
 }
 
+// esbuild's own dev server only serves files that exist under `servedir` —
+// it has no notion of client-side routing. Without a fallback, a hard
+// refresh on any route other than "/" (e.g. /todo-item with
+// @aeon-framework/router in history mode) hits esbuild's server for a path
+// that isn't a real file and gets a plain 404, even though the app's own
+// router would happily render that route once main.js loads. Fixed with
+// esbuild's documented recipe (https://esbuild.github.io/api/#serve-proxy):
+// esbuild's server binds to an internal port only, and a small proxy in
+// front of it serves index.html for any *navigation* request (no file
+// extension) that esbuild 404s on, so the client-side router gets a chance
+// to take over — matching how a production SPA host (Netlify, Vercel, etc.)
+// would be configured. Real asset requests (main.js, main.js.map, css,
+// images — anything with an extension) still 404 normally if truly missing.
 async function dev(dir) {
   const { root, entry } = resolveApp(dir);
   const outdir = path.join(root, '.aeon', 'dev');
@@ -45,9 +59,42 @@ async function dev(dir) {
     logLevel: 'info',
   });
   await ctx.watch();
-  const { host, port } = await ctx.serve({ servedir: root, port: 5173 });
-  log(`dev server running at http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`);
-  log('watching for changes...');
+  const { host: esbuildHost, port: esbuildPort } = await ctx.serve({ servedir: root, port: 0 });
+
+  const PORT = 5173;
+  const proxy = http.createServer((req, res) => {
+    const options = {
+      hostname: esbuildHost,
+      port: esbuildPort,
+      path: req.url,
+      method: req.method,
+      headers: req.headers,
+    };
+    const proxyReq = http.request(options, (proxyRes) => {
+      const isNavigationRequest = proxyRes.statusCode === 404 && path.extname(req.url.split('?')[0]) === '';
+      if (isNavigationRequest) {
+        // Re-request "/" from esbuild and serve that instead — lets the
+        // client-side router resolve the actual route once it boots.
+        http
+          .request(
+            { hostname: esbuildHost, port: esbuildPort, path: '/', method: 'GET', headers: { accept: 'text/html' } },
+            (indexRes) => {
+              res.writeHead(200, { ...indexRes.headers });
+              indexRes.pipe(res, { end: true });
+            }
+          )
+          .end();
+        return;
+      }
+      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+      proxyRes.pipe(res, { end: true });
+    });
+    req.pipe(proxyReq, { end: true });
+  });
+  proxy.listen(PORT, () => {
+    log(`dev server running at http://localhost:${PORT}`);
+    log('watching for changes...');
+  });
 }
 
 async function build(dir) {

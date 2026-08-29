@@ -104,7 +104,7 @@ vite@latest` (one-off create command):
 npm install -g @aeon-framework/cli
 aeon new my-app
 cd my-app && npm install
-npx aeon dev .        # dev server with live rebuild
+npx aeon dev .        # dev server with live rebuild (SPA fallback for @aeon-framework/router)
 npx aeon build .      # production bundle to dist/
 
 # or, zero-install:
@@ -173,6 +173,20 @@ const router = createRouter(
 router.start();
 // in a template: ${() => outlet(router)}   and   ${link(router, '/users/1', 'Ada')}
 ```
+
+In `mode: 'history'` (the default), a hard refresh on a non-root route (e.g.
+`/users/1`) needs the *server* to respond with the app shell for that URL too
+— the router only resolves it client-side once `main.js` has actually
+loaded. `aeon dev` handles this for you: it's a small proxy in front of
+esbuild's own dev server (esbuild has no notion of client-side routing) that
+serves `index.html` for any navigation request esbuild 404s on, so a refresh
+on any route works during development — covered by
+`packages/cli/test/dev-spa-fallback.test.mjs`, which hits a real running dev
+server over HTTP. For a production static host, configure the same SPA
+fallback rule the host provides (Netlify's `_redirects`, Vercel's rewrites,
+nginx's `try_files`, etc.) — or skip the question entirely with `'hash'`
+mode, or use `@aeon-framework/ssr` to render each route server-side (see
+"SSR + hydration" below, including the per-request routing pattern).
 
 ## Forms
 
