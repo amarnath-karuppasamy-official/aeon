@@ -1,4 +1,4 @@
-import { createToken } from '@aeon/di';
+import { createToken } from '@aeon-framework/di';
 
 export const GreetingService = createToken('GreetingService');
 

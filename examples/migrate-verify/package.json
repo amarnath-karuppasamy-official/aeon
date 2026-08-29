@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "dependencies": {
-    "@aeon/core": "*",
+    "@aeon-framework/core": "*",
     "react": "^19.0.0"
   }
 }

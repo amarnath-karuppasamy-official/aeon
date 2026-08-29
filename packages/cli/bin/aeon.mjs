@@ -58,7 +58,7 @@ async function build(dir) {
     sourcemap: true,
     format: 'esm',
     metafile: true,
-    // Matters for apps embedding React/Vue via @aeon/interop — without this,
+    // Matters for apps embedding React/Vue via @aeon-framework/interop — without this,
     // those packages bundle their (much larger) development builds.
     define: { 'process.env.NODE_ENV': '"production"' },
     conditions: ['production'],
@@ -100,7 +100,7 @@ function copyRecursive(src, dest) {
 }
 
 async function migrateFile(file) {
-  const { migrate, MARKER } = await import('@aeon/migrate');
+  const { migrate, MARKER } = await import('@aeon-framework/migrate');
   if (!file) {
     console.error(`Usage: aeon migrate <file.jsx>\n\nAdd "// ${MARKER}" as the first line of a React file, then run this on it.`);
     process.exit(1);
@@ -133,7 +133,7 @@ Usage:
   aeon new <name>       Scaffold a new Aeon app
   aeon dev [dir]         Start the dev server (default: current directory)
   aeon build [dir]       Production build to dist/
-  aeon migrate <file>    Best-effort React -> Aeon codemod (needs @aeon/migrate installed)
+  aeon migrate <file>    Best-effort React -> Aeon codemod (needs @aeon-framework/migrate installed)
 `);
 }
 

@@ -1,4 +1,4 @@
-import { html, signal, list } from '@aeon/core';
+import { html, signal, list } from '@aeon-framework/core';
 
 let nextId = 4;
 export const users = signal([

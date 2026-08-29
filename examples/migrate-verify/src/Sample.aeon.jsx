@@ -1,4 +1,4 @@
-import { signal, html } from '@aeon/core';
+import { signal, html } from '@aeon-framework/core';
 
 import { useState, useEffect } from 'react';
 

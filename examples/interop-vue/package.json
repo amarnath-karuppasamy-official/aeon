@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "dependencies": {
-    "@aeon/core": "*",
-    "@aeon/interop": "*",
+    "@aeon-framework/core": "*",
+    "@aeon-framework/interop": "*",
     "vue": "^3.5.0"
   }
 }

@@ -48,7 +48,7 @@ function copyRecursive(src, dst) {
 fs.mkdirSync(dest, { recursive: true });
 copyRecursive(templateDir, dest);
 
-// `create-aeon`'s template package.json is shared with `@aeon/cli`'s; give
+// `create-aeon`'s template package.json is shared with `@aeon-framework/cli`'s; give
 // the new project the actual folder name instead of the generic placeholder.
 const pkgPath = path.join(dest, 'package.json');
 const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));

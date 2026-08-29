@@ -1,5 +1,5 @@
-import { html, signal } from '@aeon/core';
-import { control, group, validators } from '@aeon/forms';
+import { html, signal } from '@aeon-framework/core';
+import { control, group, validators } from '@aeon-framework/forms';
 
 export default function Contact() {
   const form = group({

@@ -52,7 +52,7 @@ export function migrate(source) {
 
   if (!anyConverted) return { marker: true, components: report, output: null };
 
-  const header = "import { signal, html } from '@aeon/core';\n";
+  const header = "import { signal, html } from '@aeon-framework/core';\n";
   return { marker: true, components: report, output: header + '\n' + outputParts.join('\n\n') + '\n' };
 }
 
@@ -330,7 +330,7 @@ function convertJSXChild(node, stateNames, handlerNames, setterNames) {
     const expr = node.expression;
     if (t.isJSXEmptyExpression(expr)) return '';
     if (isMapCall(expr)) {
-      throw new Unsupported('renders a list via .map() — convert to @aeon/core\'s list() helper manually');
+      throw new Unsupported('renders a list via .map() — convert to @aeon-framework/core\'s list() helper manually');
     }
     if (t.isConditionalExpression(expr) && (t.isJSXElement(expr.consequent) || t.isJSXElement(expr.alternate) || expr.consequent.type === 'NullLiteral' || expr.alternate.type === 'NullLiteral')) {
       const cons = jsxBranchToCode(expr.consequent, stateNames, handlerNames, setterNames);

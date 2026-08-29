@@ -1,5 +1,5 @@
 import { createApp, h, ref, defineComponent } from 'vue';
-import { AeonView, useAeonSignal } from '@aeon/interop/vue';
+import { AeonView, useAeonSignal } from '@aeon-framework/interop/vue';
 import { AeonCounter, sharedCount } from '../../shared/aeon-counter.js';
 
 const App = defineComponent({

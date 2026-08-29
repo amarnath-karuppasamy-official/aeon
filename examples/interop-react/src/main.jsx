@@ -1,6 +1,6 @@
 import { createElement, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { AeonView, useAeonSignal } from '@aeon/interop/react';
+import { AeonView, useAeonSignal } from '@aeon-framework/interop/react';
 import { AeonCounter, sharedCount } from '../../shared/aeon-counter.js';
 
 function App() {

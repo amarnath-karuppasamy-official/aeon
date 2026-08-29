@@ -1,5 +1,5 @@
 {
-  "name": "@aeon/router",
+  "name": "@aeon-framework/router",
   "version": "0.1.0",
   "description": "Aeon router: signal-driven client-side routing.",
   "type": "module",
@@ -12,7 +12,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@aeon/core": "^0.1.0"
+    "@aeon-framework/core": "^0.1.0"
   },
   "publishConfig": {
     "access": "public"

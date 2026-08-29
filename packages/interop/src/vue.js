@@ -1,5 +1,5 @@
 import { h, defineComponent, ref as vueRef, onMounted, onUnmounted, shallowRef } from 'vue';
-import { effect } from '@aeon/core';
+import { effect } from '@aeon-framework/core';
 import { attach } from './vanilla.js';
 
 /** Mount an Aeon component as a leaf inside a Vue tree. */

@@ -8,12 +8,12 @@
     "build": "aeon build ."
   },
   "dependencies": {
-    "@aeon/core": "^0.1.0",
-    "@aeon/router": "^0.1.0",
-    "@aeon/forms": "^0.1.0",
-    "@aeon/di": "^0.1.0"
+    "@aeon-framework/core": "^0.1.0",
+    "@aeon-framework/router": "^0.1.0",
+    "@aeon-framework/forms": "^0.1.0",
+    "@aeon-framework/di": "^0.1.0"
   },
   "devDependencies": {
-    "@aeon/cli": "^0.1.0"
+    "@aeon-framework/cli": "^0.1.0"
   }
 }

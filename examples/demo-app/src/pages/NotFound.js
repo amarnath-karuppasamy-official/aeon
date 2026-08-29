@@ -1,4 +1,4 @@
-import { html } from '@aeon/core';
+import { html } from '@aeon-framework/core';
 
 export default function NotFound() {
   return html`<section>

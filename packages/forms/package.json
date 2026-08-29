@@ -1,5 +1,5 @@
 {
-  "name": "@aeon/forms",
+  "name": "@aeon-framework/forms",
   "version": "0.1.0",
   "description": "Aeon forms: signal-backed controls and groups with composable validators.",
   "type": "module",
@@ -12,7 +12,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@aeon/core": "^0.1.0"
+    "@aeon-framework/core": "^0.1.0"
   },
   "publishConfig": {
     "access": "public"

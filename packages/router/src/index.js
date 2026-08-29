@@ -1,7 +1,7 @@
 // Aeon router: a signal *is* the current route. Navigation writes to it,
 // every subscriber (the outlet, nav-highlighting, guards) updates in lockstep
 // with the rest of the reactive graph — no separate router-state system.
-import { signal, html } from '@aeon/core';
+import { signal, html } from '@aeon-framework/core';
 
 function compilePath(path) {
   const keys = [];

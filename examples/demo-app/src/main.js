@@ -1,6 +1,6 @@
-import { mount, html } from '@aeon/core';
-import { createRouter, outlet, link } from '@aeon/router';
-import { provide } from '@aeon/di';
+import { mount, html } from '@aeon-framework/core';
+import { createRouter, outlet, link } from '@aeon-framework/router';
+import { provide } from '@aeon-framework/di';
 import { GreetingService, createGreetingService } from './services/greeting.js';
 import Home from './pages/Home.js';
 import About from './pages/About.js';

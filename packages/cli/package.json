@@ -1,5 +1,5 @@
 {
-  "name": "@aeon/cli",
+  "name": "@aeon-framework/cli",
   "version": "0.1.0",
   "description": "Aeon CLI: scaffold, dev server, and production build powered by esbuild.",
   "type": "module",
@@ -10,7 +10,7 @@
     "esbuild": "^0.24.0"
   },
   "optionalDependencies": {
-    "@aeon/migrate": "^0.1.0"
+    "@aeon-framework/migrate": "^0.1.0"
   },
   "publishConfig": {
     "access": "public"

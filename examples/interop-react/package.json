@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "dependencies": {
-    "@aeon/core": "*",
-    "@aeon/interop": "*",
+    "@aeon-framework/core": "*",
+    "@aeon-framework/interop": "*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   }

@@ -1,4 +1,4 @@
-import { html, computed } from '@aeon/core';
+import { html, computed } from '@aeon-framework/core';
 import { users } from './Users.js';
 
 export default function UserDetail({ params }) {

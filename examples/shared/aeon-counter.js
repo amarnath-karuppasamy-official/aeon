@@ -1,6 +1,6 @@
 // A plain Aeon component — no idea it's being embedded in a React or Vue app.
 // That's the point: the host framework doesn't get a say in how this renders.
-import { html, signal } from '@aeon/core';
+import { html, signal } from '@aeon-framework/core';
 
 export const sharedCount = signal(0);
 

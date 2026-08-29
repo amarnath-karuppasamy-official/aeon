@@ -1,5 +1,5 @@
 {
-  "name": "@aeon/migrate",
+  "name": "@aeon-framework/migrate",
   "version": "0.1.0",
   "description": "Best-effort codemod: converts common React function components (useState + plain JSX) to Aeon. Marker-comment triggered, never overwrites your file, flags anything it can't safely convert instead of guessing.",
   "type": "module",

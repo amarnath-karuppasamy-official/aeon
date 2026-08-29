@@ -1,6 +1,6 @@
 // Aeon forms: a control's value is a signal, so a template that reads
 // control.value is already live — no separate "form state" to sync.
-import { signal, computed } from '@aeon/core';
+import { signal, computed } from '@aeon-framework/core';
 
 export const validators = {
   required: (message = 'This field is required.') => (value) =>

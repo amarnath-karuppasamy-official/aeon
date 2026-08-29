@@ -5,7 +5,7 @@
 // framework-specific adapter in this package (react.js, vue.js, …) is a thin
 // wrapper around exactly this function; use it directly for a framework that
 // doesn't have one yet (Angular, Svelte, plain Web Components, …).
-import { mount } from '@aeon/core';
+import { mount } from '@aeon-framework/core';
 
 /**
  * Attach an Aeon component to a container element you already control.

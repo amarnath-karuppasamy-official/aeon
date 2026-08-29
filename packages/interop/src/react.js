@@ -5,7 +5,7 @@
 //   and want a shared store both sides can read).
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { createElement } from 'react';
-import { effect } from '@aeon/core';
+import { effect } from '@aeon-framework/core';
 import { attach } from './vanilla.js';
 
 /** Mount an Aeon component as a leaf inside a React tree. */

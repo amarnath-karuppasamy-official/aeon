@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "dependencies": {
-    "@aeon/core": "*",
-    "@aeon/router": "*",
-    "@aeon/forms": "*",
-    "@aeon/di": "*"
+    "@aeon-framework/core": "*",
+    "@aeon-framework/router": "*",
+    "@aeon-framework/forms": "*",
+    "@aeon-framework/di": "*"
   }
 }

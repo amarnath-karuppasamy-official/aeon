@@ -1,4 +1,4 @@
-import { mount, html, signal } from '@aeon/core';
+import { mount, html, signal } from '@aeon-framework/core';
 
 // A signal is the whole story: writing to `count.value` re-renders only the
 // two spots below that actually depend on it — nothing else re-runs.

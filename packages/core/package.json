@@ -1,6 +1,6 @@
 {
-  "name": "@aeon/core",
-  "version": "0.1.0",
+  "name": "@aeon-framework/core",
+  "version": "0.1.1",
   "description": "Aeon core: signals, fine-grained DOM rendering, components. No virtual DOM.",
   "type": "module",
   "main": "./src/index.js",

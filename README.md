@@ -25,7 +25,7 @@ inherent to "batteries-included framework." Aeon keeps the batteries
 - **No decorators, no DI ceremony.** `createToken()` + `provide()` +
   `inject()` are plain functions. Components are plain functions that return
   a template.
-- **No required build step for the framework itself.** `@aeon/core` is
+- **No required build step for the framework itself.** `@aeon-framework/core` is
   dependency-free ES modules — you can `import` it directly in a browser.
   The CLI (esbuild-based) exists for bundling and dev-server convenience,
   not because the framework needs a compiler to function.
@@ -46,11 +46,11 @@ combined drop-in build below (core + router + forms + DI, everything) is
 **Portable** — three usage modes, each actually run and checked, not just
 claimed:
 
-1. **npm + bundler** (the normal path) — `@aeon/core` has zero runtime
+1. **npm + bundler** (the normal path) — `@aeon-framework/core` has zero runtime
    dependencies and `"sideEffects": false`, so a bundler tree-shakes away
    whatever you don't import.
 2. **No build step at all** — `examples/no-build/index.html` imports
-   `@aeon/core` straight from its source files with a plain
+   `@aeon-framework/core` straight from its source files with a plain
    `<script type="module">` and a relative path. No esbuild, no CLI, no
    `npm install`. It works because the framework is just standards-compliant
    ES modules — nothing to transpile.
@@ -76,35 +76,50 @@ npm run portability-check    # signals work with zero DOM, checked on Node + Bun
 
 | Package | What it does |
 |---|---|
-| `@aeon/core` | `signal`, `computed`, `effect`, `batch`, the `html` template tag, `render`, `list` (keyed lists), `mount`, `onMount`/`onCleanup` |
-| `@aeon/router` | `createRouter`, hash or history mode, params, `outlet`, `link` |
-| `@aeon/forms` | `control`, `group`, composable `validators` |
-| `@aeon/di` | `createToken`, `provide`, `inject`, scoped `Container` |
-| `@aeon/cli` | `aeon new / dev / build / migrate` — esbuild-powered, zero config |
-| `@aeon/interop` | Embed Aeon inside React/Vue (and vice versa) — `AeonView`, `useAeonSignal` |
-| `@aeon/migrate` | Codemod: converts a defined subset of React function components to Aeon |
+| `@aeon-framework/core` | `signal`, `computed`, `effect`, `batch`, the `html` template tag, `render`, `list` (keyed lists), `mount`, `onMount`/`onCleanup` |
+| `@aeon-framework/router` | `createRouter`, hash or history mode, params, `outlet`, `link` |
+| `@aeon-framework/forms` | `control`, `group`, composable `validators` |
+| `@aeon-framework/di` | `createToken`, `provide`, `inject`, scoped `Container` |
+| `@aeon-framework/cli` | `aeon new / dev / build / migrate` — esbuild-powered, zero config |
+| `@aeon-framework/interop` | Embed Aeon inside React/Vue (and vice versa) — `AeonView`, `useAeonSignal` |
+| `@aeon-framework/migrate` | Codemod: converts a defined subset of React function components to Aeon |
 
 ## Quickstart
+
+Aeon is published on npm — no cloning this repo required. Two equivalent
+ways to start a new app, same as `ng new` (global CLI) or `npm create
+vite@latest` (one-off create command):
+
+```sh
+# Angular-style: install the CLI once, reuse it everywhere
+npm install -g @aeon-framework/cli
+aeon new my-app
+cd my-app && npm install
+npx aeon dev .        # dev server with live rebuild
+npx aeon build .      # production bundle to dist/
+
+# or, zero-install:
+npm create aeon@latest my-app
+```
+
+Both produce the identical starter app — `aeon new` is for people who'll
+scaffold more than one project and want the `aeon` command on their PATH;
+`npm create aeon` is for a one-off with nothing to install afterward.
+
+If you're working from a clone of this repo instead (e.g. to run the demo
+app or contribute), use the CLI's local entry point:
 
 ```sh
 npm install
 node packages/cli/bin/aeon.mjs new my-app
-cd my-app && npm install
-npx aeon dev .      # dev server with live rebuild
-npx aeon build .     # production bundle to dist/
-```
-
-Or run the included demo app (counter, DI-provided service, hash router with
-route params, keyed list reconciliation, reactive form validation):
-
-```sh
-npm run demo         # aeon dev examples/demo-app
+npm run demo         # aeon dev examples/demo-app — counter, DI, router,
+                      # keyed lists, and forms all exercised together
 ```
 
 ## A component
 
 ```js
-import { html, signal, mount } from '@aeon/core';
+import { html, signal, mount } from '@aeon-framework/core';
 
 function Counter() {
   const count = signal(0);
@@ -131,7 +146,7 @@ inputs), `@event=${fn}` (listener), `?bool=${v}` (toggled attribute).
 ## Routing
 
 ```js
-import { createRouter, outlet, link } from '@aeon/router';
+import { createRouter, outlet, link } from '@aeon-framework/router';
 
 const router = createRouter(
   [
@@ -149,7 +164,7 @@ router.start();
 ## Forms
 
 ```js
-import { control, group, validators } from '@aeon/forms';
+import { control, group, validators } from '@aeon-framework/forms';
 
 const form = group({
   email: control('', [validators.required(), validators.email()]),
@@ -162,7 +177,7 @@ const form = group({
 ## DI
 
 ```js
-import { createToken, provide, inject } from '@aeon/di';
+import { createToken, provide, inject } from '@aeon-framework/di';
 
 const Logger = createToken('Logger');
 provide(Logger, () => ({ log: (msg) => console.log(msg) }));
@@ -181,7 +196,7 @@ never touches nodes it wasn't given.
 **Aeon inside React:**
 
 ```jsx
-import { AeonView, useAeonSignal } from '@aeon/interop/react';
+import { AeonView, useAeonSignal } from '@aeon-framework/interop/react';
 import { sharedCount } from './aeon-counter.js';
 
 function Page() {
@@ -195,9 +210,9 @@ function Page() {
 }
 ```
 
-**Aeon inside Vue** works the same way (`@aeon/interop/vue`, a
+**Aeon inside Vue** works the same way (`@aeon-framework/interop/vue`, a
 `defineComponent` wrapper plus a `useAeonSignal` composable built on
-`shallowRef`). A **vanilla** entry point (`@aeon/interop/vanilla`) covers any
+`shallowRef`). A **vanilla** entry point (`@aeon-framework/interop/vanilla`) covers any
 framework without a dedicated adapter: `attach(container, Component, props)`
 returns a dispose function you call on teardown.
 
@@ -225,7 +240,7 @@ npx aeon migrate src/Counter.jsx    # writes src/Counter.aeon.jsx — never touc
 ```
 
 Add `// @aeon-migrate` above a component to opt it in. The codemod
-(`@aeon/migrate`, built on Babel's parser/traverse/generator) converts:
+(`@aeon-framework/migrate`, built on Babel's parser/traverse/generator) converts:
 
 - `useState` → `signal()`, including the functional-updater form
   (`setX(c => c + 1)` → `x.value = x.value + 1`)
@@ -316,10 +331,10 @@ validation all confirmed working end to end):
 - Three verified portability modes: bundler, zero-build native ESM, and a
   plain `<script>` global — plus a DOM-free reactive core that runs
   standalone on Node and Bun
-- Bidirectional interop with React and Vue (`@aeon/interop`), verified with
+- Bidirectional interop with React and Vue (`@aeon-framework/interop`), verified with
   headless-browser tests that check both isolation and signal sync in both
   directions
-- A scoped, tested React→Aeon migration codemod (`@aeon/migrate` /
+- A scoped, tested React→Aeon migration codemod (`@aeon-framework/migrate` /
   `aeon migrate`) that converts a defined subset correctly and safely bails
   out — leaving the original untouched — on everything outside that subset
 - A real-DOM performance benchmark against React/Vue/Preact/Solid
@@ -354,8 +369,8 @@ packages/
 examples/
   demo-app/           exercises every package together
   minimal-app/         the counter used for size measurements
-  no-build/             @aeon/core via native ESM, zero tooling
-  standalone-drop-in/   @aeon/core via a plain <script> tag
+  no-build/             @aeon-framework/core via native ESM, zero tooling
+  standalone-drop-in/   @aeon-framework/core via a plain <script> tag
   interop-react/        Aeon embedded inside a React app, both directions
   interop-vue/          Aeon embedded inside a Vue app, both directions
   migrate-verify/        real, unedited codemod output, verified in-browser

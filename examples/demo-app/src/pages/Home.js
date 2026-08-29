@@ -1,5 +1,5 @@
-import { html, signal, computed } from '@aeon/core';
-import { inject } from '@aeon/di';
+import { html, signal, computed } from '@aeon-framework/core';
+import { inject } from '@aeon-framework/di';
 import { GreetingService } from '../services/greeting.js';
 
 export default function Home() {
