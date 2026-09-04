@@ -1,0 +1,31 @@
+{
+  "name": "@aeon-framework/compiler",
+  "version": "0.1.0",
+  "description": "Aeon static analysis: the first real milestone toward an AOT compiler — whole-project checks (real binding-kind validation, unused @aeon-framework/* imports, unreachable routes) powering `aeon check`. Not runtime binding optimization, not whole-program dead-code elimination.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "types": "./src/index.d.ts",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@aeon-framework/mcp": "^0.1.0"
+  },
+  "peerDependencies": {
+    "@aeon-framework/core": "^0.1.0"
+  },
+  "devDependencies": {
+    "@aeon-framework/core": "^0.1.0",
+    "@aeon-framework/router": "^0.1.0"
+  }
+}

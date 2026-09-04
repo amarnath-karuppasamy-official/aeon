@@ -267,6 +267,34 @@ function generate(kind, name, cwd = '.') {
   return dest;
 }
 
+/**
+ * `aeon check [dir]` — static analysis (the first real milestone toward an
+ * AOT compiler; see @aeon-framework/compiler's README section). Runs the
+ * real analyzeProject() against `dir`'s src/ and prints every finding.
+ * Exits non-zero when any `error`-severity finding exists — `warning`
+ * findings are printed but don't fail the run.
+ */
+async function check(dir) {
+  const root = path.resolve(process.cwd(), dir);
+  const { analyzeProject } = await import('@aeon-framework/compiler');
+  const findings = await analyzeProject({ projectDir: root });
+
+  if (findings.length === 0) {
+    log('check passed: no findings.');
+    return;
+  }
+
+  for (const f of findings) {
+    const tag = f.severity === 'error' ? '\x1b[31merror\x1b[0m' : '\x1b[33mwarning\x1b[0m';
+    console.log(`${tag}  ${f.file}:${f.line}  [${f.rule}]  ${f.message}`);
+  }
+
+  const errorCount = findings.filter((f) => f.severity === 'error').length;
+  const warningCount = findings.length - errorCount;
+  log(`check found ${errorCount} error(s), ${warningCount} warning(s).`);
+  if (errorCount > 0) process.exit(1);
+}
+
 function help() {
   console.log(`Aeon CLI
 
@@ -280,6 +308,9 @@ Usage:
   aeon generate component <Name>   Scaffold src/components/<Name>.js (alias: aeon g component <Name>)
   aeon generate service <Name>     Scaffold src/services/<name>.js (alias: aeon g service <Name>)
   aeon generate route <Name>       Scaffold src/routes/<Name>.js (alias: aeon g route <Name>)
+  aeon check [dir]                  Static analysis: real binding-kind footguns, unused imports,
+                                    unreachable routes (see README's "Static analysis" section).
+                                    Exits non-zero on any error-severity finding.
 `);
 }
 
@@ -303,6 +334,9 @@ switch (cmd) {
   case 'generate':
   case 'g':
     generate(args[1], args[2]);
+    break;
+  case 'check':
+    await check(target);
     break;
   default:
     help();

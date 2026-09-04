@@ -80,7 +80,7 @@ npm run portability-check    # signals work with zero DOM, checked on Node + Bun
 | `@aeon-framework/router` | `createRouter`, hash or history mode, params, `outlet`, `link`, `guard`/`beforeEnter`-style route guards |
 | `@aeon-framework/forms` | `control`, `group`, composable `validators` |
 | `@aeon-framework/di` | `createToken`, `provide`, `inject`, scoped `Container` |
-| `@aeon-framework/cli` | `aeon new / dev / build / prerender / migrate / generate` (alias `g`) — esbuild-powered, zero config |
+| `@aeon-framework/cli` | `aeon new / dev / build / prerender / migrate / generate / check` (alias `g`) — esbuild-powered, zero config |
 | `@aeon-framework/interop` | Embed Aeon inside React/Vue (and vice versa) — `AeonView`, `useAeonSignal` |
 | `@aeon-framework/migrate` | Codemod: converts a defined subset of React function components to Aeon |
 | `@aeon-framework/http` | `resource()` (reactive fetch), `mutation()` (imperative actions), plain `http.*` fetch helpers |
@@ -91,6 +91,7 @@ npm run portability-check    # signals work with zero DOM, checked on Node + Bun
 | `@aeon-framework/i18n` | `locale` signal, `t(key, params)` interpolation + pluralization, `loadMessages()`, fallback locale chain |
 | `@aeon-framework/devtools` | `attachDevtools()` / `mountDevtoolsOverlay()` — an in-page (not a browser extension) live signal inspector |
 | `@aeon-framework/mcp` | `aeon-mcp` — an MCP server for AI coding assistants: code generation, docs search, conventions, project inspection, and real-compiler-backed template explanation (see [MCP server](#mcp-server)) |
+| `@aeon-framework/compiler` | `analyzeProject()` — whole-project static analysis powering `aeon check`: real binding-kind footguns, unused `@aeon-framework/*` imports, unreachable routes (see [Static analysis](#static-analysis)) |
 | `create-aeon` | `npm create aeon@latest my-app` — the zero-install scaffolder |
 
 Every package ships hand-written `.d.ts` declarations — TypeScript projects get full autocomplete and type-checking with no separate `@types/*` package, and no build step generates them (they're maintained by hand alongside the JS, and verified against real `tsc` runs, not just eyeballed).
@@ -524,6 +525,41 @@ test (`packages/cli/test/cli-generate.test.mjs`) that shells out to the real
 `aeon` binary against a temp directory and asserts the generated file
 exists and its content matches.
 
+## Static analysis
+
+`aeon check [dir]` (backed by `@aeon-framework/compiler`, exported as
+`analyzeProject({ projectDir })` for programmatic use too) is **the first
+real milestone toward an Aeon AOT compiler — not the whole thing.** It's a
+whole-*project* static analysis pass: it scans every `.js`/`.jsx`/`.ts`/`.tsx`
+file under `src/` (never `eval()`s or `import()`s the project's own code —
+same discipline as `inspect_project`, see [MCP server](#mcp-server)) and
+reports three kinds of real, provable problems:
+
+| Check | Severity | What it catches |
+|---|---|---|
+| Binding-kind footguns | `error` | Every real `html\`...\`` template in the project, run through Aeon's actual compiler (the same `explain_template` logic the MCP server uses — not a re-implemented regex guess) — flags `ref=`/`key=`/`model=` and anything else the real compiler silently mis-treats. |
+| Unreachable routes | `error` (duplicate path) / `warning` (trailing route after a catch-all) | Two routes with the literal same `path` (the second can never be reached), and a `path: '*'` catch-all that isn't the *last* entry (`matchRoute()` returns the first match — see `packages/router/src/index.js` — so everything after a non-last catch-all is dead). |
+| Unused `@aeon-framework/*` imports | `warning` | A named import from any `@aeon-framework/*` package that's never referenced again in the file. |
+
+```sh
+aeon check .
+```
+
+```
+error  src/components/UserForm.js:12  [binding-footgun]  `ref=`: NOT a real Aeon binding kind: ...
+warning  src/routes/index.js:8  [unreachable-route]  Route `/about` is unreachable — the catch-all route `path: '*'` on line 6 comes before it and matches every path first (@aeon-framework/router's matchRoute() returns the first match).
+[aeon] check found 1 error(s), 1 warning(s).
+```
+
+Exits non-zero when any `error`-severity finding exists (so it's CI-friendly
+as a build gate); `warning` findings print but don't fail the run.
+
+**What this genuinely is not (yet):** this is static *analysis* — it finds
+real mistakes before runtime — not compile-time binding optimization
+(templates are still tagged-literal + runtime-parsed, same as today) and not
+whole-program dead-code elimination. Those are further-out milestones on the
+same road, tracked honestly in "What's real vs. what's next" below.
+
 ## Devtools
 
 `@aeon-framework/devtools` is an **in-page debug overlay** — a small,
@@ -894,14 +930,27 @@ validation all confirmed working end to end):
   signal overlay — `attachDevtools()`/`mountDevtoolsOverlay()` plus a
   `track()`/`untrack()` registry, tested with Happy DOM confirming the
   panel's DOM text updates when a tracked signal's value changes
+- `@aeon-framework/compiler`: **the first real milestone toward an AOT
+  compiler** — whole-project static analysis (`aeon check`), not runtime
+  binding optimization and not whole-program dead-code elimination (see
+  "Static analysis" above for the honest scope line). Real binding-kind
+  footguns via Aeon's actual compiler (reusing `explain_template`'s logic,
+  not a copy of it), unused `@aeon-framework/*` import detection, and
+  unreachable-route detection (duplicate paths, a non-last catch-all) proven
+  against `@aeon-framework/router`'s real `matchRoute()` first-match
+  semantics — tested against real fixture projects, including
+  false-positive checks (a correctly-used import, a legitimately-last
+  catch-all) and a real end-to-end run of the `aeon check` binary
 
 Not yet built — the honest gap list for anything claiming to seriously
-compete with Angular: a real compiler (current templates are tagged-literal
-+ runtime-parsed, not compile-time optimized), a real Chrome DevTools
-*extension* (`@aeon-framework/devtools` is an in-page overlay only, not a
-panel integrated into the browser's own DevTools), a migration codemod that
-covers more than the current `useState`-only subset, and — the actually
-hard part — an ecosystem and community.
+compete with Angular: compile-time binding optimization and whole-program
+dead-code elimination (current templates are still tagged-literal +
+runtime-parsed — `@aeon-framework/compiler`'s static analysis pass above is
+a real first step toward a compiler, not the compiler itself), a real
+Chrome DevTools *extension* (`@aeon-framework/devtools` is an in-page
+overlay only, not a panel integrated into the browser's own DevTools), a
+migration codemod that covers more than the current `useState`-only subset,
+and — the actually hard part — an ecosystem and community.
 
 The architecture here (signals, no vdom, plain functions over decorators) is
 a defensible bet on where the frameworks are heading; the distance to

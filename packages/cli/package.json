@@ -1,12 +1,13 @@
 {
   "name": "@aeon-framework/cli",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Aeon CLI: scaffold, dev server, and production build powered by esbuild.",
   "type": "module",
   "bin": {
     "aeon": "./bin/aeon.mjs"
   },
   "dependencies": {
+    "@aeon-framework/compiler": "^0.1.0",
     "esbuild": "^0.24.0"
   },
   "optionalDependencies": {
