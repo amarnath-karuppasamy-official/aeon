@@ -1,0 +1,31 @@
+{
+  "name": "@aeon-framework/ssg",
+  "version": "0.1.0",
+  "description": "Aeon SSG: prerender routes to real static .html files on disk using the real @aeon-framework/ssr renderer (no parallel string renderer), for the aeon prerender CLI command.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "types": "./src/index.d.ts",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@aeon-framework/router": "^0.1.0",
+    "@aeon-framework/ssr": "^0.1.0"
+  },
+  "peerDependencies": {
+    "@aeon-framework/core": "^0.1.0"
+  },
+  "devDependencies": {
+    "happy-dom": "^20.0.0"
+  }
+}

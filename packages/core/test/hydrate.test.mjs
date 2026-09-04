@@ -56,7 +56,37 @@ test('hydrate() adopts existing text/attribute DOM without recreating nodes', ()
   dispose();
 });
 
-test('hydrate() falls back to a fresh client render for list()-bound regions', () => {
+test('hydrate() adopts server-rendered list() rows without recreating their DOM nodes', () => {
+  const items = signal([{ id: 1, label: 'a' }, { id: 2, label: 'b' }, { id: 3, label: 'c' }]);
+  function List() {
+    return html`<ul>${() => list(() => items.value, (i) => i.id, (i) => html`<li>${i.label}</li>`)}</ul>`;
+  }
+  const serverContainer = document.createElement('div');
+  const serverDispose = mount(List, serverContainer);
+  const serverHtml = serverContainer.innerHTML;
+  serverDispose();
+
+  const clientContainer = document.createElement('div');
+  clientContainer.innerHTML = serverHtml;
+  const lisBefore = [...clientContainer.querySelectorAll('li')];
+  assert.equal(lisBefore.length, 3);
+  assert.deepEqual(lisBefore.map((li) => li.textContent), ['a', 'b', 'c']);
+
+  const dispose = hydrateComponent(List, clientContainer);
+
+  const lisAfter = [...clientContainer.querySelectorAll('li')];
+  assert.equal(lisAfter.length, 3);
+  // Node-identity check, same pattern as the non-list hydration test above:
+  // hydration must have adopted these exact <li> elements, not torn them
+  // down and re-rendered a fresh set.
+  assert.equal(lisAfter[0], lisBefore[0]);
+  assert.equal(lisAfter[1], lisBefore[1]);
+  assert.equal(lisAfter[2], lisBefore[2]);
+
+  dispose();
+});
+
+test('hydrate() + list(): adding an item after hydration appends a new row without disturbing the adopted rows', () => {
   const items = signal([{ id: 1, label: 'a' }, { id: 2, label: 'b' }]);
   function List() {
     return html`<ul>${() => list(() => items.value, (i) => i.id, (i) => html`<li>${i.label}</li>`)}</ul>`;
@@ -68,14 +98,88 @@ test('hydrate() falls back to a fresh client render for list()-bound regions', (
 
   const clientContainer = document.createElement('div');
   clientContainer.innerHTML = serverHtml;
+  const adopted = [...clientContainer.querySelectorAll('li')];
   const dispose = hydrateComponent(List, clientContainer);
-  const lis = clientContainer.querySelectorAll('li');
-  assert.equal(lis.length, 2);
-  assert.equal(lis[0].textContent, 'a');
-  assert.equal(lis[1].textContent, 'b');
 
   items.value = [...items.value, { id: 3, label: 'c' }];
-  assert.equal(clientContainer.querySelectorAll('li').length, 3);
+
+  const lis = [...clientContainer.querySelectorAll('li')];
+  assert.equal(lis.length, 3);
+  assert.deepEqual(lis.map((li) => li.textContent), ['a', 'b', 'c']);
+  // The two original (server-rendered, hydration-adopted) rows are still
+  // the exact same nodes — only the new row is actually new.
+  assert.equal(lis[0], adopted[0]);
+  assert.equal(lis[1], adopted[1]);
+
+  dispose();
+});
+
+test('hydrate() + list(): removing an item after hydration removes only that row', () => {
+  const items = signal([{ id: 1, label: 'a' }, { id: 2, label: 'b' }, { id: 3, label: 'c' }]);
+  function List() {
+    return html`<ul>${() => list(() => items.value, (i) => i.id, (i) => html`<li>${i.label}</li>`)}</ul>`;
+  }
+  const serverContainer = document.createElement('div');
+  const serverDispose = mount(List, serverContainer);
+  const serverHtml = serverContainer.innerHTML;
+  serverDispose();
+
+  const clientContainer = document.createElement('div');
+  clientContainer.innerHTML = serverHtml;
+  const adopted = [...clientContainer.querySelectorAll('li')];
+  const dispose = hydrateComponent(List, clientContainer);
+
+  items.value = items.value.filter((i) => i.id !== 2);
+
+  const lis = [...clientContainer.querySelectorAll('li')];
+  assert.equal(lis.length, 2);
+  assert.deepEqual(lis.map((li) => li.textContent), ['a', 'c']);
+  assert.equal(lis[0], adopted[0]);
+  assert.equal(lis[1], adopted[2]);
+  // The removed row's node is actually gone from the document, not just
+  // unlinked from the list's own bookkeeping.
+  assert.equal(clientContainer.contains(adopted[1]), false);
+
+  dispose();
+});
+
+test('hydrate() + list(): full round trip — SSR three items, hydrate, click-remove the middle one', () => {
+  const items = signal([{ id: 1, label: 'a' }, { id: 2, label: 'b' }, { id: 3, label: 'c' }]);
+  function remove(id) {
+    items.value = items.value.filter((i) => i.id !== id);
+  }
+  function List() {
+    return html`<ul>${() =>
+      list(
+        () => items.value,
+        (i) => i.id,
+        (i) => html`<li>${i.label}<button class="rm" @click=${() => remove(i.id)}>x</button></li>`
+      )}</ul>`;
+  }
+  const serverContainer = document.createElement('div');
+  const serverDispose = mount(List, serverContainer);
+  const serverHtml = serverContainer.innerHTML;
+  serverDispose();
+
+  const clientContainer = document.createElement('div');
+  clientContainer.innerHTML = serverHtml;
+  const adopted = [...clientContainer.querySelectorAll('li')];
+  assert.equal(adopted.length, 3);
+
+  const dispose = hydrateComponent(List, clientContainer);
+
+  // The remove button hydration attached a real listener to the SAME
+  // server-rendered <li> — clicking it must actually work.
+  const middleButton = clientContainer.querySelectorAll('li')[1].querySelector('.rm');
+  middleButton.click();
+
+  const lis = [...clientContainer.querySelectorAll('li')];
+  assert.equal(lis.length, 2);
+  assert.deepEqual(lis.map((li) => li.firstChild.textContent), ['a', 'c']);
+  // Items 1 and 3 are still the original server-rendered nodes.
+  assert.equal(lis[0], adopted[0]);
+  assert.equal(lis[1], adopted[2]);
+
   dispose();
 });
 

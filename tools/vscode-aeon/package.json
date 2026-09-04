@@ -1,0 +1,59 @@
+{
+  "name": "vscode-aeon",
+  "displayName": "Aeon",
+  "description": "Syntax highlighting and binding-kind hover docs for Aeon's html`` templates (attr=, .prop=, @event=, ?bool=) inside JS/TS/JSX/TSX.",
+  "version": "0.1.0",
+  "publisher": "aeon-framework",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "aeon",
+    "html",
+    "template literal",
+    "signals",
+    "syntax highlighting"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/amarnath-karuppasamy-official/aeon.git",
+    "directory": "tools/vscode-aeon"
+  },
+  "bugs": {
+    "url": "https://github.com/amarnath-karuppasamy-official/aeon/issues"
+  },
+  "homepage": "https://github.com/amarnath-karuppasamy-official/aeon#readme",
+  "main": "./src/extension.js",
+  "activationEvents": [
+    "onLanguage:javascript",
+    "onLanguage:javascriptreact",
+    "onLanguage:typescript",
+    "onLanguage:typescriptreact"
+  ],
+  "contributes": {
+    "grammars": [
+      {
+        "scopeName": "inline.aeon-html",
+        "path": "./syntaxes/aeon-html.tmLanguage.json",
+        "injectTo": [
+          "source.js",
+          "source.jsx",
+          "source.js.jsx",
+          "source.ts",
+          "source.tsx"
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "test": "node test/tokenize-grammar.test.js && node test/hover.test.js"
+  },
+  "devDependencies": {
+    "vscode-oniguruma": "^2.0.1",
+    "vscode-textmate": "^9.3.2"
+  }
+}

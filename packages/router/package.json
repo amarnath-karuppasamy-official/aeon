@@ -1,6 +1,6 @@
 {
   "name": "@aeon-framework/router",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Aeon router: signal-driven client-side routing.",
   "type": "module",
   "main": "./src/index.js",
@@ -13,6 +13,9 @@
   },
   "dependencies": {
     "@aeon-framework/core": "^0.1.0"
+  },
+  "devDependencies": {
+    "happy-dom": "^20.0.0"
   },
   "publishConfig": {
     "access": "public"

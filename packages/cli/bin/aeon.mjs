@@ -2,7 +2,7 @@
 // Aeon CLI — no config file needed for a basic app. Just enough tooling to
 // scaffold, run, and build; the framework itself stays a set of small
 // dependency-free ES modules.
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -123,6 +123,72 @@ async function build(dir) {
   return result;
 }
 
+/**
+ * `aeon prerender [dir]` — static site generation, on top of the same
+ * esbuild build() step as `aeon build`, plus @aeon-framework/ssg's real
+ * SSR-backed prerender(). Convention: the app has a dedicated
+ * `src/ssg.{ts,tsx,js,jsx}` entry (separate from `src/main.js`, which has
+ * side effects — it calls mount() against `document` at module scope) that
+ * exports:
+ *   - `router`  — the app's already-created @aeon-framework/router Router
+ *   - `App`     — the root component `router` closes over
+ *   - `paths`   — (optional) string[] of concrete paths for any dynamic
+ *                 (':param') route, same as @aeon-framework/ssg's `paths`
+ * Bundled with esbuild (so TS/JSX and workspace-relative imports all work
+ * exactly like `main.js` does), then imported for real and run through
+ * @aeon-framework/ssg's prerender() — no separate/parallel implementation.
+ */
+function resolveSsgEntry(root) {
+  const candidates = ['ssg.tsx', 'ssg.ts', 'ssg.jsx', 'ssg.js'].map((f) => path.join(root, 'src', f));
+  return candidates.find((f) => fs.existsSync(f));
+}
+
+async function prerenderApp(dir) {
+  const { root } = resolveApp(dir);
+  const ssgEntry = resolveSsgEntry(root);
+  if (!ssgEntry) {
+    console.error(
+      `Cannot find src/ssg.{ts,tsx,js,jsx} under ${root}.\n` +
+        `aeon prerender needs a dedicated entry (separate from main.js) that exports ` +
+        `{ router, App, paths? } — see the "SSG" section of the Aeon README.`
+    );
+    process.exit(1);
+  }
+
+  // Build the normal client bundle first, same as `aeon build` — the
+  // prerendered HTML files still load this to hydrate on the client.
+  await build(dir);
+
+  const outdir = path.join(root, 'dist');
+  const bundledEntry = path.join(root, '.aeon', 'ssg', 'entry.mjs');
+  await esbuild.build({
+    entryPoints: [ssgEntry],
+    bundle: true,
+    outfile: bundledEntry,
+    platform: 'node',
+    format: 'esm',
+    define: { 'process.env.NODE_ENV': '"production"' },
+    conditions: ['production'],
+  });
+
+  const mod = await import(`${pathToFileURL(bundledEntry).href}?t=${Date.now()}`);
+  const { router, App, paths } = mod;
+  if (!router || !App) {
+    console.error(`${ssgEntry} must export both \`router\` and \`App\`.`);
+    process.exit(1);
+  }
+
+  const { prerender } = await import('@aeon-framework/ssg');
+  // Use the just-built dist/index.html as the shell (it already has main.js
+  // pointed at the production bundle, not the dev-server path) rather than
+  // the source index.html template build() started from.
+  const shellCandidate = path.join(outdir, 'index.html');
+  const shellPath = fs.existsSync(shellCandidate) ? shellCandidate : undefined;
+  const written = await prerender({ router, App, outDir: outdir, shellPath, paths: paths || [] });
+  for (const page of written) log(`prerendered ${page.path} -> ${path.relative(root, page.file)}`);
+  log(`prerender complete: ${written.length} page(s) written to ${outdir}`);
+}
+
 function scaffold(name, { ts = false } = {}) {
   const dest = path.resolve(process.cwd(), name);
   const templateDir = path.join(__dirname, '..', ts ? 'template-ts' : 'template');
@@ -208,6 +274,8 @@ Usage:
   aeon new <name> [--ts]           Scaffold a new Aeon app (add --ts for the TypeScript starter)
   aeon dev [dir]                   Start the dev server (default: current directory)
   aeon build [dir]                 Production build to dist/
+  aeon prerender [dir]              Static-render every route to dist/*.html (needs @aeon-framework/ssg
+                                    installed + a src/ssg.js entry exporting { router, App }; see README's "SSG" section)
   aeon migrate <file>               Best-effort React -> Aeon codemod (needs @aeon-framework/migrate installed)
   aeon generate component <Name>   Scaffold src/components/<Name>.js (alias: aeon g component <Name>)
   aeon generate service <Name>     Scaffold src/services/<name>.js (alias: aeon g service <Name>)
@@ -225,6 +293,9 @@ switch (cmd) {
     break;
   case 'build':
     await build(target);
+    break;
+  case 'prerender':
+    await prerenderApp(target);
     break;
   case 'migrate':
     await migrateFile(args[1]);

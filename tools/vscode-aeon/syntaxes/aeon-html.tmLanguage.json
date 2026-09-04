@@ -1,0 +1,88 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Aeon Embedded HTML",
+  "scopeName": "inline.aeon-html",
+  "injectionSelector": "L:source.js -comment -string, L:source.jsx -comment -string, L:source.ts -comment -string, L:source.tsx -comment -string",
+  "patterns": [
+    { "include": "#aeon-html-template" }
+  ],
+  "repository": {
+    "aeon-html-template": {
+      "comment": "Only matches a template literal immediately preceded by the `html` tag identifier — this is what keeps a plain (untagged) template literal from ever picking up Aeon/HTML highlighting.",
+      "begin": "(?<=\\bhtml)`",
+      "beginCaptures": {},
+      "end": "`",
+      "name": "meta.embedded.block.html.aeon",
+      "patterns": [
+        { "include": "#aeon-interpolation" },
+        { "include": "#aeon-tag" },
+        { "include": "text.html.basic" }
+      ]
+    },
+    "aeon-interpolation": {
+      "comment": "A `${...}` interpolation inside the html`` body. Matched before the generic HTML include so its JS contents don't get misparsed as markup, and so it doesn't swallow the closing backtick of the outer template on a stray `}`.",
+      "begin": "\\$\\{",
+      "beginCaptures": { "0": { "name": "punctuation.definition.template-expression.begin.aeon" } },
+      "end": "\\}",
+      "endCaptures": { "0": { "name": "punctuation.definition.template-expression.end.aeon" } },
+      "name": "meta.embedded.line.js.aeon",
+      "patterns": [{ "include": "source.js" }]
+    },
+    "aeon-tag": {
+      "comment": "A single HTML start tag, scanned attribute-by-attribute so each of Aeon's four binding-prefix kinds (.prop= @event= ?bool= attr=) gets its own distinct scope before falling back to the built-in HTML tag grammar for everything else (tag name, plain attributes, quotes).",
+      "begin": "(<)([a-zA-Z][a-zA-Z0-9:-]*)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.html" },
+        "2": { "name": "entity.name.tag.html" }
+      },
+      "end": "(/?>)",
+      "endCaptures": { "1": { "name": "punctuation.definition.tag.end.html" } },
+      "name": "meta.tag.aeon",
+      "patterns": [
+        { "include": "#aeon-property-binding" },
+        { "include": "#aeon-event-binding" },
+        { "include": "#aeon-boolean-binding" },
+        { "include": "#aeon-plain-attribute" },
+        { "include": "#aeon-interpolation" },
+        { "include": "text.html.basic#attribute" },
+        { "include": "text.html.basic#string-double-quoted" },
+        { "include": "text.html.basic#string-single-quoted" }
+      ]
+    },
+    "aeon-property-binding": {
+      "comment": "Aeon's `.prop=` DOM-property binding — el[name] = value (see dom.js's `kind === 'property'` branch). Distinct scope from a plain attribute so it reads visually different.",
+      "match": "(\\.)([a-zA-Z_$][\\w$-]*)(=)",
+      "captures": {
+        "1": { "name": "punctuation.definition.aeon-binding-prefix.property" },
+        "2": { "name": "entity.other.attribute-name.property.aeon" },
+        "3": { "name": "punctuation.separator.key-value.html" }
+      }
+    },
+    "aeon-event-binding": {
+      "comment": "Aeon's `@event=` listener binding — el.addEventListener(name, value) (see dom.js's `kind === 'event'` branch).",
+      "match": "(@)([a-zA-Z_$][\\w$-]*)(=)",
+      "captures": {
+        "1": { "name": "punctuation.definition.aeon-binding-prefix.event" },
+        "2": { "name": "entity.other.attribute-name.event.aeon" },
+        "3": { "name": "punctuation.separator.key-value.html" }
+      }
+    },
+    "aeon-boolean-binding": {
+      "comment": "Aeon's `?bool=` boolean-attribute binding — el.toggleAttribute(name, !!value) (see dom.js's `kind === 'boolean'` branch).",
+      "match": "(\\?)([a-zA-Z_$][\\w$-]*)(=)",
+      "captures": {
+        "1": { "name": "punctuation.definition.aeon-binding-prefix.boolean" },
+        "2": { "name": "entity.other.attribute-name.boolean.aeon" },
+        "3": { "name": "punctuation.separator.key-value.html" }
+      }
+    },
+    "aeon-plain-attribute": {
+      "comment": "A plain `attr=` binding (or a static, non-bound attribute) — el.setAttribute(name, value). Kept as the normal HTML attribute-name scope on purpose (no `.aeon` suffix) since this is the one kind that should look exactly like ordinary HTML.",
+      "match": "([a-zA-Z_:][\\w:.-]*)(=)",
+      "captures": {
+        "1": { "name": "entity.other.attribute-name.html" },
+        "2": { "name": "punctuation.separator.key-value.html" }
+      }
+    }
+  }
+}

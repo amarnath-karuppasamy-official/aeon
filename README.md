@@ -77,15 +77,16 @@ npm run portability-check    # signals work with zero DOM, checked on Node + Bun
 | Package | What it does |
 |---|---|
 | `@aeon-framework/core` | `signal`, `computed`, `effect`, `batch`, the `html` template tag, `render`, `list` (keyed lists), `mount`, `hydrate`/`hydrateComponent`, `onMount`/`onCleanup` |
-| `@aeon-framework/router` | `createRouter`, hash or history mode, params, `outlet`, `link` |
+| `@aeon-framework/router` | `createRouter`, hash or history mode, params, `outlet`, `link`, `guard`/`beforeEnter`-style route guards |
 | `@aeon-framework/forms` | `control`, `group`, composable `validators` |
 | `@aeon-framework/di` | `createToken`, `provide`, `inject`, scoped `Container` |
-| `@aeon-framework/cli` | `aeon new / dev / build / migrate / generate` (alias `g`) — esbuild-powered, zero config |
+| `@aeon-framework/cli` | `aeon new / dev / build / prerender / migrate / generate` (alias `g`) — esbuild-powered, zero config |
 | `@aeon-framework/interop` | Embed Aeon inside React/Vue (and vice versa) — `AeonView`, `useAeonSignal` |
 | `@aeon-framework/migrate` | Codemod: converts a defined subset of React function components to Aeon |
 | `@aeon-framework/http` | `resource()` (reactive fetch), `mutation()` (imperative actions), plain `http.*` fetch helpers |
 | `@aeon-framework/testing` | `render()`/`fireEvent`/`cleanup()` — mount a component into a real (Happy DOM) document and test it |
 | `@aeon-framework/ssr` | `renderToString()` — server-render a component/template to an HTML string using the real client renderer, no parallel string renderer |
+| `@aeon-framework/ssg` | `prerender()` — build-time static site generation on top of `@aeon-framework/ssr`; real `.html` files on disk (see "SSG" below) |
 | `@aeon-framework/animate` | `transition()` / `animatedList()` — signal-driven enter/leave transitions, including animated list-row removal |
 | `@aeon-framework/i18n` | `locale` signal, `t(key, params)` interpolation + pluralization, `loadMessages()`, fallback locale chain |
 | `@aeon-framework/devtools` | `attachDevtools()` / `mountDevtoolsOverlay()` — an in-page (not a browser extension) live signal inspector |
@@ -197,7 +198,40 @@ server over HTTP. For a production static host, configure the same SPA
 fallback rule the host provides (Netlify's `_redirects`, Vercel's rewrites,
 nginx's `try_files`, etc.) — or skip the question entirely with `'hash'`
 mode, or use `@aeon-framework/ssr` to render each route server-side (see
-"SSR + hydration" below, including the per-request routing pattern).
+"SSR + hydration" below, including the per-request routing pattern), or
+prerender every route at build time (see "SSG" below).
+
+**Route guards.** A route can carry a `guard` — Angular calls this
+`CanActivate` — run before the route is entered:
+
+```js
+const router = createRouter([
+  { path: '/', component: Home },
+  {
+    path: '/admin',
+    component: AdminDashboard,
+    guard: async (to, from) => {
+      const ok = await session.isAuthenticated();
+      if (!ok) return '/login'; // redirect instead of entering
+      return true; // allow
+    },
+  },
+  { path: '/login', component: Login },
+]);
+```
+
+Return (or resolve to) `true` to allow the navigation, `false` to block it
+(the router's `location`/`matched` signals — and therefore `outlet()` — are
+left exactly as they were; the blocked route's component never runs), or a
+path string to redirect there instead (the redirect target's own guard, if
+any, runs too). `navigate()` genuinely `await`s an async guard before
+committing anything — the signals never update mid-flight, only once the
+guard has actually resolved — and `router.start()`'s initial sync runs the
+same guard check against the URL the page loaded on, so a guarded route
+can't be reached by a hard refresh either. Covered by
+`packages/router/test/router.test.mjs`, including a block, a synchronous
+redirect, a genuinely-awaited async guard (proven with a `setTimeout`, not
+just a resolved promise, so there's no race), and the initial-sync case.
 
 ## Forms
 
@@ -305,18 +339,24 @@ verify — not just "the DOM looks right afterward," but that the same DOM
 nodes survived hydration and a listener attached during hydration actually
 fires and updates a signal-bound text node.
 
-**Disclosed limitation — list hydration flashes once.** A `list()`-bound
-region has no per-row marker to resync against (only the anchor for the
-list *as a whole*), so hydrating one clears the server-rendered rows and
-does one ordinary client-side `list()` render in their place — a one-time
-flash limited to that region. Everything else (including a *nested*
+**List hydration doesn't flash either.** A `list()`-bound region hydrates
+incrementally too, the same as everything else: `list()`'s renderer leaves a
+small marker comment after every row (in addition to the marker that already
+closes the list region as a whole), so hydration can resync the server-
+rendered DOM back into per-row boundaries, re-derive the same keys
+`itemsFn()`/`keyFn()` would produce, and adopt each row's existing element(s)
+by reference — no clear-and-rebuild step, and no node recreated. The adopted
+rows are wired into the exact same keyed-reconciliation state `list()`'s
+normal updates use, so a subsequent client-side add/remove/reorder on the
+same list works exactly as it would have without SSR involved at all.
+Covered by `packages/core/test/hydrate.test.mjs` (node-identity checks
+before/after hydration, an add, a remove, and a full SSR → hydrate →
+click-to-remove round trip) and `packages/ssr/test/ssr.test.mjs` (the same,
+through the real `renderToString()` output). Everything else — attributes,
+properties, event listeners, plain text/element node content, and a nested
 `html` template used as a node-part's value, e.g. `${() => cond() ?
-html\`<b>A</b>\` : html\`<i>B</i>\`}`) hydrates without recreating a node.
-This is a real, deliberate scope cut, not an oversight — solving
-non-flashing incremental list hydration (matching each row to a stable
-per-row marker, handling reordering, etc.) is a meaningfully larger problem
-that's called out in "What's real vs. what's next" below instead of being
-half-solved here.
+html\`<b>A</b>\` : html\`<i>B</i>\`}` — hydrates without recreating a node
+either, as before.
 
 **Per-request SSR with the router.** `renderToString()`'s Happy DOM window is
 installed with a real origin (`http://localhost/`), not Happy DOM's default
@@ -343,6 +383,63 @@ function handleRequest(req, res) {
 Covered by `packages/ssr/test/ssr.test.mjs`, which asserts `router.navigate()`
 before `renderToString()` doesn't throw and that the resulting HTML matches
 the navigated-to route, not whatever route the router started on.
+
+## SSG
+
+`@aeon-framework/ssg`'s `prerender()` does build-time static site
+generation on top of `@aeon-framework/ssr` — it doesn't reimplement
+rendering, it drives the exact same per-request pattern shown above
+(`router.navigate(path)` then `renderToString(App)`) once per route and
+writes the result to a real `.html` file on disk.
+
+```js
+// src/ssg.js — a dedicated entry, separate from src/main.js (main.js has
+// side effects: it calls mount() against `document` at module scope, which
+// prerender() must not trigger when it imports this file for the router
+// table + App component).
+import { html } from '@aeon-framework/core';
+import { createRouter, outlet } from '@aeon-framework/router';
+import Home from './pages/Home.js';
+import About from './pages/About.js';
+import UserDetail from './pages/UserDetail.js';
+
+export const router = createRouter([
+  { path: '/', component: Home },
+  { path: '/about', component: About },
+  { path: '/users/:id', component: UserDetail },
+]);
+
+export function App() {
+  return html`<main>${() => outlet(router)}</main>`;
+}
+
+// Required for every DYNAMIC route (':param') — prerender() can't guess
+// route params, so it throws a clear error naming the route if this is
+// missing rather than silently skipping it.
+export const paths = ['/users/1', '/users/2'];
+```
+
+```sh
+npx aeon prerender .    # builds dist/main.js (same as `aeon build`), then
+                         # writes dist/index.html, dist/about/index.html,
+                         # dist/users/1/index.html, dist/users/2/index.html
+```
+
+File convention (clean URLs, matching what most static hosts expect):
+`/` → `index.html`, `/about` → `about/index.html`, `/users/1` →
+`users/1/index.html`. Each file is the app's `index.html` shell with
+`<div id="app"></div>` replaced by `<div id="app" data-ssr="1">...</div>`
+around the real rendered HTML — the same substitution `renderToString()`'s
+own usage pattern above uses — so the shipped `main.js` bundle can
+`hydrateComponent()` straight into it with no flash, list rows included.
+
+`prerender({ router, App, outDir, shellPath?, paths? })` is also usable
+directly (without the CLI) from a build script — `packages/ssg/src/index.d.ts`
+documents the full API. Covered by `packages/ssg/test/ssg.test.mjs`, which
+reads the actual files back off disk and asserts each contains the real
+rendered content for its route (not just that the files exist), and by
+`packages/cli/test/prerender.test.mjs`, which runs the real `aeon prerender`
+binary against a fixture app.
 
 ## Animate
 
@@ -524,6 +621,73 @@ literal `ref="..."` attribute, which is exactly the kind of framework-shaped
 bug a diff-based code review tends to miss. `explain_template` catches it
 before the code ever runs.
 
+## VS Code extension
+
+`tools/vscode-aeon/` is a VS Code extension for Aeon's `html\`...\`` template
+literals. It is **not published to the VS Code Marketplace or Open VSX** —
+there are no publisher credentials in this environment to do that with — but
+it's real, installable, working code today. It does two things:
+
+1. **Syntax highlighting.** A TextMate injection grammar
+   (`syntaxes/aeon-html.tmLanguage.json`) that activates only inside a
+   template literal immediately tagged `html` (via an
+   `(?<=\bhtml)\`` … `` \` `` begin/end rule) inside `.js`/`.jsx`/`.ts`/`.tsx`
+   files — a plain, untagged `` `...` `` string is left completely alone.
+   Inside that block it reuses VS Code's built-in `text.html.basic` grammar
+   for ordinary markup, and gives each of Aeon's four real attribute-binding
+   kinds (see "Attribute bindings support four kinds" above) its own
+   TextMate scope so they're visually distinct at a glance:
+   - `attr=` → the ordinary `entity.other.attribute-name.html` scope (looks
+     like normal HTML, on purpose — this is the one kind that IS normal HTML)
+   - `.prop=` → `entity.other.attribute-name.property.aeon`
+   - `@event=` → `entity.other.attribute-name.event.aeon`
+   - `?bool=` → `entity.other.attribute-name.boolean.aeon`
+
+   Every `${...}` interpolation inside the block — attribute value or node
+   content — is scoped as real embedded JS (`source.js`), including nested
+   `html\`...\`` templates inside an interpolation.
+
+2. **A hover provider** (`src/extension.js` / `src/binding-hover.js`).
+   Hovering over one of the four binding prefixes inside an `html` template
+   shows what it really compiles to. This isn't a copy-pasted explanation —
+   it dynamically imports and calls the real `explainTemplate()` from
+   `@aeon-framework/mcp` (`packages/mcp/src/explain-template.js`), which in
+   turn runs Aeon's actual compiler
+   (`packages/core/src/dom.js`'s `compile()`) on a minimal fragment built
+   from the exact token under the cursor — so the hover text (including the
+   `ref=`/`key=`/`model=` footgun warnings) can never drift out of sync with
+   what Aeon's renderer really does.
+
+**How this was verified** (no VS Code binary is reachable from this
+environment's network egress — `@vscode/test-electron`'s VS Code download
+was confirmed blocked by the sandbox's proxy policy, so a real Extension
+Development Host run wasn't possible here): the grammar is tokenized with
+the real `vscode-textmate` + `vscode-oniguruma` libraries (the same
+tokenizer engine VS Code itself uses) directly against real Aeon markup —
+including a fragment taken from `examples/demo-app/src/pages/Contact.js` —
+and the returned scope names are asserted programmatically, including the
+negative case (a plain, untagged template literal gets no scoping at all).
+The hover logic is unit-tested the same way, asserting on the real
+`explainTemplate()`-backed output. Run it yourself:
+
+```sh
+cd tools/vscode-aeon
+npm install
+npm test
+```
+
+**Installing it locally** (until it's published):
+
+```sh
+cd tools/vscode-aeon
+npm install
+npx @vscode/vsce package --no-dependencies
+code --install-extension vscode-aeon-0.1.0.vsix
+```
+
+or symlink the extension folder into `~/.vscode/extensions/aeon-framework.vscode-aeon-0.1.0`
+and reload VS Code.
+
 ## Interop — using Aeon alongside another framework
 
 Aeon owns a real DOM node, not a virtual one, so embedding it inside another
@@ -660,10 +824,12 @@ validation all confirmed working end to end):
 - Fine-grained signals/computed/effect/batch with dependency tracking
 - Cached-template DOM renderer with property/attribute/event/boolean
   bindings and keyed list reconciliation (rows are repositioned, not rebuilt)
-- Hash/history router with params and a `link()` helper
+- Hash/history router with params, a `link()` helper, and `CanActivate`-style
+  route guards (block or redirect, sync or genuinely-awaited async, honored
+  by both `navigate()` and `start()`'s initial sync)
 - Reactive forms with composable validators
 - A minimal DI container
-- A zero-config CLI (`new`/`dev`/`build`) on esbuild
+- A zero-config CLI (`new`/`dev`/`build`/`prerender`) on esbuild
 - Demo app bundle: **~12 kB** minified for core + router + forms + DI + app code
 - Minimal counter app: **1.9 kB gzipped**, smallest of every framework measured
 - Three verified portability modes: bundler, zero-build native ESM, and a
@@ -700,9 +866,18 @@ validation all confirmed working end to end):
   actually fires and updates a signal-bound text node
 - `@aeon-framework/core`: `hydrate()`/`hydrateComponent()` adopt existing
   (e.g. server-rendered) DOM for attribute/property/event bindings and node
-  content, including nested `html` templates used as node-part values —
-  `list()`-bound regions are the one disclosed exception (one-time flash,
-  see "SSR + hydration" above)
+  content, including nested `html` templates used as node-part values AND
+  `list()`-bound regions — every row is adopted by reference too (a per-row
+  marker comment resyncs hydration to each row, the same scheme the list's
+  own node-part anchor already used for the region as a whole), with a later
+  client-side add/remove/reorder on the same list still going through the
+  normal keyed-reconciliation path afterward (see "SSR + hydration" above)
+- `@aeon-framework/ssg`: `prerender()` — build-time static site generation
+  on `@aeon-framework/ssr`'s real renderer (no separate string renderer),
+  writing real `.html` files per route (clean-URL convention), a required
+  explicit concrete-paths list for any dynamic route, and an `aeon
+  prerender` CLI command — tested by reading the written files back off
+  disk and checking each one's actual rendered content (see "SSG" above)
 - `@aeon-framework/animate`: `transition()`/`animatedList()` — enter/leave
   transitions with a deterministic transitionend-or-timeout resolution,
   tested with real (short) timers proving a removed row stays in the DOM
@@ -722,13 +897,11 @@ validation all confirmed working end to end):
 
 Not yet built — the honest gap list for anything claiming to seriously
 compete with Angular: a real compiler (current templates are tagged-literal
-+ runtime-parsed, not compile-time optimized), non-flashing incremental
-list hydration (SSR/hydration itself is now built — see above — but a
-`list()`-bound region still falls back to one client-side re-render), a
-real Chrome DevTools *extension* (`@aeon-framework/devtools` is an in-page
-overlay only, not a panel integrated into the browser's own DevTools), a
-migration codemod that covers more than the current `useState`-only subset,
-and — the actually hard part — an ecosystem and community.
++ runtime-parsed, not compile-time optimized), a real Chrome DevTools
+*extension* (`@aeon-framework/devtools` is an in-page overlay only, not a
+panel integrated into the browser's own DevTools), a migration codemod that
+covers more than the current `useState`-only subset, and — the actually
+hard part — an ecosystem and community.
 
 The architecture here (signals, no vdom, plain functions over decorators) is
 a defensible bet on where the frameworks are heading; the distance to
@@ -740,15 +913,16 @@ still on the list above.
 ```
 packages/
   core/     signals, renderer, component model
-  router/   client-side routing
+  router/   client-side routing, route guards
   forms/    reactive forms
   di/       dependency injection
-  cli/      scaffold, dev server, build/migrate (+ template/ and template-ts/)
+  cli/      scaffold, dev server, build/prerender/migrate (+ template/ and template-ts/)
   interop/  embed Aeon in React/Vue and vice versa
   migrate/  React → Aeon codemod (Babel-based)
   http/     resource()/mutation() — signals over fetch
   testing/  render()/fireEvent/cleanup() on a real (Happy DOM) document
   ssr/      renderToString() — server-render with the real client renderer
+  ssg/      prerender() — build-time static site generation on top of ssr/
   animate/  transition()/animatedList() — enter/leave transitions
   i18n/     locale signal, t()/loadMessages(), fallback locale chain
   devtools/ in-page live signal overlay (not a browser extension)

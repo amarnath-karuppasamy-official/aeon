@@ -6,6 +6,17 @@ const MARK = 'aeon';
 // Matches a trailing `name=` (unquoted) or `name="` / `name='` (quoted, quote captured).
 const attrBindRe = /([.?@a-zA-Z0-9_:-]+)=(["'])?$/;
 const bindTokenRe = new RegExp(`^${MARK}:(\\d+)${MARK}$`);
+// Per-row list marker: one comment placed AFTER each list() row's DOM,
+// mirroring how a node-part's own anchor marker sits after ITS content
+// (see the "Hydration" block comment below). Unlike node-part markers
+// (one static numeric index per compiled binding), a list can hold any
+// number of rows at runtime, so every row's marker shares this same
+// generic, non-numeric text -- bindTokenRe requires digits, so a row
+// marker can never be mistaken for a real node-part marker. It carries no
+// key/index itself; hydration resyncs it against itemsFn() positionally
+// (row N's marker is the Nth item in render order) -- the same order SSR
+// produced it in.
+const ROW_MARK = `${MARK}:row`;
 
 const templateCache = new WeakMap();
 
@@ -125,6 +136,7 @@ class NodePart {
     for (const entry of this.listState.values()) {
       for (const d of entry.disposers) d();
       for (const n of entry.nodes) n.remove();
+      if (entry.marker) entry.marker.remove();
     }
     this.listState = null;
   }
@@ -161,6 +173,7 @@ class NodePart {
       if (!keySet.has(key)) {
         for (const d of entry.disposers) d();
         for (const n of entry.nodes) n.remove();
+        if (entry.marker) entry.marker.remove();
       }
     }
 
@@ -170,6 +183,14 @@ class NodePart {
     // it from its old position, so this handles reordering too — the point
     // is to pay for exactly one DOM mutation for the whole list instead of
     // one per row, which is what actually costs on a 1,000-row create.
+    //
+    // Each row is followed by a marker comment (`entry.marker`) — the same
+    // "content, then a boundary marker" shape a normal node-part uses, just
+    // with a shared (non-unique) marker text since a list can hold any
+    // number of rows at runtime. This is what lets hydrate() resync per-row
+    // boundaries after `container.innerHTML` serialization/reparse instead
+    // of only having a boundary for the list as a whole; the marker is
+    // otherwise unused during a normal (non-hydrating) client render/update.
     const batch = document.createDocumentFragment();
     for (let i = 0; i < items.length; i++) {
       const key = keys[i];
@@ -177,15 +198,19 @@ class NodePart {
       let entry = prevState.get(key);
       if (entry && entry.item === item) {
         for (const n of entry.nodes) batch.appendChild(n);
+        batch.appendChild(entry.marker);
       } else {
         if (entry) {
           for (const d of entry.disposers) d();
           for (const n of entry.nodes) n.remove();
+          if (entry.marker) entry.marker.remove();
         }
         const disposers = [];
         const { fragment } = mount(renderFn(item, i), disposers);
-        entry = { nodes: Array.from(fragment.childNodes), disposers, item };
+        const marker = document.createComment(ROW_MARK);
+        entry = { nodes: Array.from(fragment.childNodes), marker, disposers, item };
         batch.appendChild(fragment);
+        batch.appendChild(marker);
       }
       nextState.set(key, entry);
     }
@@ -258,14 +283,19 @@ function mount(result, disposers) {
 // they're adopted by reference (assigned into the NodePart, never recreated)
 // rather than thrown away and rebuilt.
 //
-// Known, disclosed limitation: a `list()`-bound region cannot be hydrated
-// incrementally with this scheme (there is no per-row marker to key off of,
-// only whatever the row templates themselves render), so hydrating a list
-// falls back to clearing the server-rendered rows and doing one normal
-// client-side `list()` render in their place — a one-time flash limited to
-// list regions. Everything else (attributes, properties, event listeners,
-// plain text/element node content, and even nested `html` templates used as
-// node-part values) hydrates without recreating a single DOM node.
+// A `list()`-bound region hydrates incrementally too: `_updateList()` (above)
+// lays a marker comment after every row (`ROW_MARK`, shared/non-unique text —
+// a list holds a runtime-variable number of rows, unlike a compiled
+// binding's one static index per marker), so hydration can split the live
+// DOM between the list's own node-part anchor back into per-row segments,
+// re-derive the same keys `itemsFn()`/`keyFn()` would produce, and adopt
+// each row's existing DOM by reference — recursing the same lockstep walk
+// used for a nested template, wired into the exact `listState` shape
+// `_updateList()` itself builds so a later add/remove/reorder goes through
+// the normal keyed-reconciliation path afterward. Nothing about
+// attributes, properties, event listeners, plain text/element node content,
+// or nested `html` templates used as node-part values recreates a single
+// DOM node either.
 // ---------------------------------------------------------------------------
 
 function buildDescriptorMap(partDescriptors) {
@@ -325,14 +355,68 @@ function hydrateChildren(tParent, lParent, path, descByPath, bindings) {
   }
 }
 
+/**
+ * Split a list-bound node-part's server-rendered content into per-row
+ * segments using the `ROW_MARK` comment `_updateList()` leaves after every
+ * row. Returns `null` (rather than throwing) when the live markup doesn't
+ * actually match that shape — e.g. hand-edited HTML, or a node-part whose
+ * value just happens to carry `__aeonList` without ever having gone through
+ * `_updateList()` on the server — so the caller can fall back safely.
+ */
+function splitListRows(contentNodes) {
+  const rows = [];
+  let current = [];
+  for (const n of contentNodes) {
+    if (n.nodeType === 8 && n.data === ROW_MARK) {
+      rows.push({ nodes: current, marker: n });
+      current = [];
+    } else {
+      current.push(n);
+    }
+  }
+  if (current.length) return null; // trailing unmarked nodes: not our shape
+  return rows;
+}
+
+/**
+ * Adopt a list-bound node-part's server-rendered rows instead of clearing
+ * and re-rendering them. Builds exactly the `listState` shape `_updateList()`
+ * itself would have built (`{ nodes, marker, disposers, item }` per key), so
+ * a later reactive update to the same `list()` (add/remove/reorder) runs
+ * through the normal keyed-reconciliation path afterward, none the wiser
+ * that these particular rows started out server-rendered.
+ */
+function adoptListPart(part, value, contentNodes) {
+  const { itemsFn, keyFn, renderFn } = value;
+  const items = itemsFn();
+  const keys = items.map((item, i) => (keyFn ? keyFn(item, i) : i));
+  const rows = splitListRows(contentNodes);
+
+  if (!rows || rows.length !== items.length) {
+    // Doesn't match the row-marker shape (or the item count moved between
+    // server render and hydration) — same safe fallback as any other
+    // structural mismatch: drop what's there and do one normal client render.
+    for (const n of contentNodes) n.remove();
+    part.update(value);
+    return;
+  }
+
+  const nextState = new Map();
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const key = keys[i];
+    const { nodes: rowNodes, marker } = rows[i];
+    const disposers = [];
+    hydrateInto(renderFn(item, i), { childNodes: rowNodes }, disposers);
+    nextState.set(key, { nodes: rowNodes, marker, disposers, item });
+  }
+  part.listState = nextState;
+}
+
 /** Adopt (or, for lists, fall back to freshly rendering) a node-part's initial value. */
 function adoptNodePart(part, value, contentNodes) {
   if (value && value.__aeonList) {
-    // Documented list-hydration limitation: no stable per-row hydration
-    // anchors exist yet, so drop the server-rendered rows and do one normal
-    // client render — a disclosed, one-time flash for this region only.
-    for (const n of contentNodes) n.remove();
-    part.update(value);
+    adoptListPart(part, value, contentNodes);
     return;
   }
   if (value && value.__aeonTemplate) {
@@ -345,8 +429,9 @@ function adoptNodePart(part, value, contentNodes) {
     return;
   }
   if (Array.isArray(value) || value instanceof Node) {
-    // Mixed arrays / raw Node values aren't given per-item markers either;
-    // same disclosed fallback as list().
+    // A plain (non-`list()`) array or a raw Node value has no per-item
+    // marker scheme — only `list()` rows get one (see `adoptListPart`) — so
+    // these fall back to a fresh client render of this region.
     for (const n of contentNodes) n.remove();
     part.update(value);
     return;
@@ -404,8 +489,8 @@ function hydrateInto(result, parentLike, disposers) {
  * `@aeon-framework/ssr`'s `renderToString`). Returns a dispose function,
  * same contract as `render()`.
  *
- * See the block comment above for the exact adoption rules and the
- * list-hydration flash limitation.
+ * See the block comment above for the exact adoption rules, including how
+ * `list()`-bound regions hydrate their rows incrementally too.
  */
 export function hydrate(result, container) {
   const disposers = [];

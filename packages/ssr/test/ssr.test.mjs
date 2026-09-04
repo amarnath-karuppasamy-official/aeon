@@ -65,6 +65,44 @@ test('SSR HTML hydrates without recreating nodes and stays interactive', async (
   container.remove();
 });
 
+test('SSR + hydrate() adopts list() rows without recreating them, through the real renderToString() output', async () => {
+  const { html, list } = await import('@aeon-framework/core');
+  const items = signal([{ id: 1, label: 'a' }, { id: 2, label: 'b' }, { id: 3, label: 'c' }]);
+  function TodoList() {
+    return html`<ul>${() => list(() => items.value, (i) => i.id, (i) => html`<li>${i.label}</li>`)}</ul>`;
+  }
+
+  const serverHtml = renderToString(TodoList);
+  const container = document.createElement('div');
+  container.innerHTML = serverHtml;
+  document.body.appendChild(container);
+
+  const before = [...container.querySelectorAll('li')];
+  assert.equal(before.length, 3);
+  assert.deepEqual(before.map((li) => li.textContent), ['a', 'b', 'c']);
+
+  const dispose = hydrateComponent(TodoList, container);
+
+  // Node-identity check against the real renderToString() output, not a
+  // synthetic string built by the test.
+  const after = [...container.querySelectorAll('li')];
+  assert.equal(after[0], before[0]);
+  assert.equal(after[1], before[1]);
+  assert.equal(after[2], before[2]);
+
+  // A later client-side update to the same list still works correctly
+  // through the normal keyed-reconciliation path after hydration.
+  items.value = items.value.filter((i) => i.id !== 2);
+  const afterRemove = [...container.querySelectorAll('li')];
+  assert.equal(afterRemove.length, 2);
+  assert.deepEqual(afterRemove.map((li) => li.textContent), ['a', 'c']);
+  assert.equal(afterRemove[0], before[0]);
+  assert.equal(afterRemove[1], before[2]);
+
+  dispose();
+  container.remove();
+});
+
 // Regression test for a real bug found while dogfooding this package for a
 // per-request SSR server: renderToString()'s window used to default to
 // Happy DOM's `about:blank`, which has a null origin. @aeon-framework/router's
