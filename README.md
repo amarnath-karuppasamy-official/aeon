@@ -89,6 +89,7 @@ npm run portability-check    # signals work with zero DOM, checked on Node + Bun
 | `@aeon-framework/animate` | `transition()` / `animatedList()` — signal-driven enter/leave transitions, including animated list-row removal |
 | `@aeon-framework/i18n` | `locale` signal, `t(key, params)` interpolation + pluralization, `loadMessages()`, fallback locale chain |
 | `@aeon-framework/devtools` | `attachDevtools()` / `mountDevtoolsOverlay()` — an in-page (not a browser extension) live signal inspector |
+| `@aeon-framework/mcp` | `aeon-mcp` — an MCP server for AI coding assistants: code generation, docs search, conventions, project inspection, and real-compiler-backed template explanation (see [MCP server](#mcp-server)) |
 | `create-aeon` | `npm create aeon@latest my-app` — the zero-install scaffolder |
 
 Every package ships hand-written `.d.ts` declarations — TypeScript projects get full autocomplete and type-checking with no separate `@types/*` package, and no build step generates them (they're maintained by hand alongside the JS, and verified against real `tsc` runs, not just eyeballed).
@@ -448,6 +449,80 @@ The panel is an ordinary Aeon component under the hood (`html`/`list`/
 row updates through a plain reactive binding, no polling. Untrack with
 `devtools.registry.untrack(name)`; `devtools.destroy()` removes the overlay
 and stops listening for the hotkey entirely.
+
+## MCP server
+
+`@aeon-framework/mcp` is an [MCP](https://modelcontextprotocol.io) server —
+Aeon's answer to Angular CLI's `ng mcp` — that gives an AI coding assistant
+(Claude Code, or anything else that speaks MCP) real tools for working with
+an Aeon codebase, over the standard stdio transport.
+
+**Add it to an assistant's MCP config** — the standard `npx` form needs no
+install:
+
+```json
+{
+  "mcpServers": {
+    "aeon": {
+      "command": "npx",
+      "args": ["-y", "@aeon-framework/mcp"]
+    }
+  }
+}
+```
+
+or, once installed as a dependency/global (`npm i -D @aeon-framework/mcp` /
+`npm i -g @aeon-framework/mcp`), its `aeon-mcp` bin can be run directly:
+
+```json
+{ "mcpServers": { "aeon": { "command": "aeon-mcp" } } }
+```
+
+With Claude Code specifically: `claude mcp add aeon -- npx -y @aeon-framework/mcp`.
+
+**Tools it exposes:**
+
+| Tool | What it does |
+|---|---|
+| `generate_component` / `generate_service` / `generate_route` | Scaffold a real file (`src/components`, `src/services`, `src/routes`) into a project, using the exact same generator `aeon generate` uses — writes to disk and returns the path + content. |
+| `search_docs` | Lightweight (no embeddings) case-insensitive search over the real README.md and every package's real `src/index.d.ts`, with surrounding context per match. |
+| `get_conventions` | Aeon's curated idioms — signals vs. virtual DOM, the four real template binding kinds, DI, router modes — plus real footguns an assistant trained on React/lit-html is likely to hit (see below). |
+| `inspect_project` | Reads a real project on disk (never evaluates its code): which `@aeon-framework/*` packages it depends on, and a best-effort summary of its routes/components/services. |
+| `explain_template` | **The unique one** — see below. |
+
+### `explain_template` — a tool no other framework's MCP server has
+
+Feed it the body of an `html\`...\`` template (`${N}` for each
+interpolation, in order) and it tells you **exactly** what Aeon's real
+compiler (`packages/core/src/dom.js`'s `compile()`) decides each binding
+is — because it actually calls that real compiler, not a lookalike regex.
+Critically, it also catches the single most common mistake an AI assistant
+trained on React/lit-html/Vue makes against Aeon: reaching for a `ref=` (or
+`key=`) binding that looks like it should exist, but doesn't.
+
+```
+explain_template({ template: '<div ref=${0} @click=${1}></div>' })
+```
+
+```json
+{
+  "bindings": [
+    {
+      "slot": 0,
+      "kind": "attribute",
+      "name": "ref",
+      "note": "Plain HTML attribute binding — el.setAttribute(name, value) ...",
+      "warning": "NOT a real Aeon binding kind: Aeon has no ref= binding — there is no fifth binding kind. This becomes a literal string attribute named \"ref\", silently. Use onMount() inside the component to get element access instead, or drive behavior via .prop=/@event= bindings."
+    },
+    { "slot": 1, "kind": "event", "name": "click", "note": "Real event binding (@event=) ..." }
+  ]
+}
+```
+
+`ref=${fn}` doesn't error and doesn't call `fn` — it silently becomes a
+literal `ref="..."` attribute, which is exactly the kind of framework-shaped
+bug a diff-based code review tends to miss. `explain_template` catches it
+before the code ever runs.
 
 ## Interop — using Aeon alongside another framework
 

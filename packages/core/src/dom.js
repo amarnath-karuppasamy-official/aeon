@@ -436,3 +436,15 @@ export function render(result, container) {
 export function list(itemsFn, keyFn, renderFn) {
   return { __aeonList: true, itemsFn, keyFn, renderFn };
 }
+
+// ---------------------------------------------------------------------------
+// Internal-only re-export — NOT part of @aeon-framework/core's public API.
+// index.js (the package's "." export) deliberately does not re-export this,
+// so nothing about core's public contract changes. It exists solely so
+// tooling that needs the REAL binding-kind classification a template
+// compiles to — e.g. @aeon-framework/mcp's explain_template tool — can call
+// the actual compiler function itself (deep import of this file) instead of
+// re-implementing/guessing at its regex/attribute-prefix rules elsewhere,
+// which would drift the moment this file changes.
+// ---------------------------------------------------------------------------
+export { compile as __internal_compile };
