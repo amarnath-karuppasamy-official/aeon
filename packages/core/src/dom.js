@@ -5,7 +5,41 @@ import { effect } from './signal.js';
 const MARK = 'aeon';
 // Matches a trailing `name=` (unquoted) or `name="` / `name='` (quoted, quote captured).
 const attrBindRe = /([.?@a-zA-Z0-9_:-]+)=(["'])?$/;
-const bindTokenRe = new RegExp(`^${MARK}:(\\d+)${MARK}$`);
+const bindTokenRe = new RegExp(`^${MARK}:([0-9a-z]+):(\\d+)${MARK}$`);
+
+/**
+ * A short, deterministic, content-derived salt for one template's marker
+ * namespace (FNV-1a over the template's own literal chunks). Without this,
+ * a nested `html` template used as ANOTHER template's node-part value (a
+ * real, documented pattern) can produce a marker comment whose text
+ * collides with the ENCLOSING template's own marker at the same local
+ * index -- both number their bindings 0, 1, 2, ... independently. Hydration
+ * resyncs by comparing live comment TEXT against the compiled template's
+ * marker text (see hydrateChildren below); a collision makes it stop
+ * scanning at the wrong comment, silently mis-scoping everything
+ * downstream -- including event listeners, which is what actually breaks:
+ * the affected element still renders (content matches either way) but
+ * never gets its @click=/etc. listener attached during hydration.
+ *
+ * Deriving the salt from content (not a shared counter) is what lets two
+ * INDEPENDENT compile() calls for the identical literal template agree on
+ * it -- e.g. @aeon-framework/compiler's build-time AOT precompiler (which
+ * calls this exact compile()) and a plain runtime compile() call for the
+ * same call site during @aeon-framework/ssg's prerender(): a page
+ * precompiled for the client bundle and prerendered to static HTML by a
+ * completely separate process still agree on every marker's exact text.
+ */
+function templateSalt(strings) {
+  let h = 0x811c9dc5;
+  for (const chunk of strings) {
+    for (let i = 0; i < chunk.length; i++) {
+      h ^= chunk.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    h ^= 0x1f; // separator, so ['ab','c'] and ['a','bc'] don't collide
+  }
+  return (h >>> 0).toString(36);
+}
 // Per-row list marker: one comment placed AFTER each list() row's DOM,
 // mirroring how a node-part's own anchor marker sits after ITS content
 // (see the "Hydration" block comment below). Unlike node-part markers
@@ -26,6 +60,7 @@ export function html(strings, ...values) {
 }
 
 function compile(strings) {
+  const salt = templateSalt(strings);
   let htmlString = '';
   for (let i = 0; i < strings.length; i++) {
     htmlString += strings[i];
@@ -34,9 +69,9 @@ function compile(strings) {
       if (attrMatch) {
         // Quoted (`name="`) — the closing quote already lives in the next chunk.
         // Unquoted (`name=`) — wrap the marker in quotes ourselves so the HTML stays valid.
-        htmlString += attrMatch[2] ? `${MARK}:${i}${MARK}` : `"${MARK}:${i}${MARK}"`;
+        htmlString += attrMatch[2] ? `${MARK}:${salt}:${i}${MARK}` : `"${MARK}:${salt}:${i}${MARK}"`;
       } else {
-        htmlString += `<!--${MARK}:${i}${MARK}-->`;
+        htmlString += `<!--${MARK}:${salt}:${i}${MARK}-->`;
       }
     }
   }
@@ -69,11 +104,11 @@ function walkForParts(node, path, out) {
       else if (name[0] === '.') { kind = 'property'; name = name.slice(1); }
       else if (name[0] === '?') { kind = 'boolean'; name = name.slice(1); }
       node.removeAttribute(attr.name);
-      out.push({ path, index: Number(m[1]), kind, name });
+      out.push({ path, index: Number(m[2]), kind, name });
     }
   } else if (node.nodeType === 8) {
     const m = bindTokenRe.exec(node.data);
-    if (m) out.push({ path, index: Number(m[1]), kind: 'node' });
+    if (m) out.push({ path, index: Number(m[2]), kind: 'node' });
   }
   const children = node.childNodes;
   for (let i = 0; i < children.length; i++) walkForParts(children[i], [...path, i], out);
@@ -357,7 +392,7 @@ function hydrateChildren(tParent, lParent, path, descByPath, bindings) {
           li++;
           lc = lParent.childNodes[li];
         }
-        bindings.push({ path: curPath, index: Number(m[1]), kind: 'node', anchorLive: lc, contentNodes });
+        bindings.push({ path: curPath, index: Number(m[2]), kind: 'node', anchorLive: lc, contentNodes });
         if (lc) li++; // step past the anchor itself
         continue;
       }
@@ -372,8 +407,26 @@ function hydrateChildren(tParent, lParent, path, descByPath, bindings) {
       continue;
     }
 
-    // Static text or a plain (non-binding) comment: one live node consumed, no binding.
-    li++;
+    // Static text or a plain (non-binding) comment. A static text node here
+    // may have been merged, at HTML-parse time, with an adjacent static text
+    // node from the ENCLOSING template's own boundary text: the parser
+    // coalesces any two consecutive text nodes into one, and that happens
+    // whenever a nested template's leading or trailing whitespace sits
+    // right up against a sibling's whitespace with no element or comment
+    // between them (e.g. `${childTemplate}` at the very start of a parent's
+    // own text run). When this template is being hydrated as that nested
+    // value (via adoptNodePart's `contentNodes` recursion), its own leading
+    // text chunk was already consumed by the ENCLOSING walk as part of that
+    // merged node — there is no live text node left here for it to claim.
+    // Only step over a live node for a static text chunk when one genuinely
+    // remains (nodeType 3); a non-text comment can never merge like this, so
+    // it always advances. Skipping the advance when there's nothing of the
+    // right kind to consume keeps `li` aligned with reality instead of
+    // stepping onto (and thereby skipping) the next real element or marker,
+    // which would desync every following sibling's index.
+    if (tChild.nodeType !== 3 || (lParent.childNodes[li] && lParent.childNodes[li].nodeType === 3)) {
+      li++;
+    }
   }
 }
 

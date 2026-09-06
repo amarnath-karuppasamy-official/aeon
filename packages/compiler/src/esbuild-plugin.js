@@ -87,6 +87,35 @@ function findHtmlCalls(ast, localName) {
 }
 
 /**
+ * Aeon templates nest routinely — `html\`...${html\`<b>...\`}...\`` is a
+ * documented, supported pattern (a nested template used as a node-part's
+ * value; see the README's "SSR + hydration" section). `findHtmlCalls()`
+ * above walks the WHOLE AST, so it finds both an outer call and any inner
+ * one(s) sitting inside the outer template's interpolated expressions.
+ * Precompiling every match independently and splicing all of them in would
+ * double-edit the same source range (the outer edit's [start,end) fully
+ * contains the inner one's), corrupting the file — the outer replacement's
+ * `end` offset is computed against the pre-edit source, but by the time
+ * it's applied the inner edit has already shifted everything between the
+ * two, so the outer splice lands on the wrong characters.
+ *
+ * The fix: only precompile OUTERMOST call sites. An inner `html\`\`` call is
+ * left inside the outer call's own expression source verbatim (unmodified,
+ * un-precompiled) — correct output, just not doubly optimized; exactly the
+ * same "leave it be" fallback this plugin already uses for any template it
+ * can't safely handle.
+ */
+function keepOutermost(calls) {
+  const sorted = [...calls].sort((a, b) => a.start - b.start);
+  const outermost = [];
+  for (const call of sorted) {
+    const isNested = outermost.some((parent) => call.start >= parent.start && call.end <= parent.end);
+    if (!isNested) outermost.push(call);
+  }
+  return outermost;
+}
+
+/**
  * Rewrite one file's source. Returns `{ contents, loader }` when at least
  * one template was precompiled, or `undefined` to let esbuild load the file
  * exactly as it would have without this plugin (no import to precompile,
@@ -129,7 +158,7 @@ async function precompileFile(filePath, source) {
   const localHtmlName = findLocalHtmlName(ast);
   if (!localHtmlName) return undefined; // no `html` import from @aeon-framework/core — never guess at a same-named identifier
 
-  const calls = findHtmlCalls(ast, localHtmlName);
+  const calls = keepOutermost(findHtmlCalls(ast, localHtmlName));
   if (calls.length === 0) return undefined;
 
   const edits = [];

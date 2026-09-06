@@ -6,14 +6,18 @@
   "workspaces": [
     "packages/*",
     "examples/*",
-    "benchmark/*"
+    "benchmark/*",
+    "site"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "build:standalone": "node scripts/build-standalone.mjs",
     "test": "node --test packages/core/test/*.test.mjs packages/migrate/test/*.test.mjs packages/http/test/*.test.mjs packages/testing/test/*.test.mjs packages/ssr/test/*.test.mjs packages/animate/test/*.test.mjs packages/i18n/test/*.test.mjs packages/cli/test/*.test.mjs packages/devtools/test/*.test.mjs packages/mcp/test/*.test.mjs packages/router/test/*.test.mjs packages/ssg/test/*.test.mjs packages/compiler/test/*.test.mjs packages/interop/test/*.test.mjs",
     "portability-check": "node scripts/portability-check.mjs",
-    "demo": "node packages/cli/bin/aeon.mjs dev examples/demo-app"
+    "demo": "node packages/cli/bin/aeon.mjs dev examples/demo-app",
+    "site:dev": "node packages/cli/bin/aeon.mjs dev site",
+    "site:prerender": "node packages/cli/bin/aeon.mjs prerender site && node scripts/finish-site-build.mjs",
+    "site:verify": "node scripts/verify-site.mjs"
   },
   "devDependencies": {
     "@angular/compiler": "^19.2.25",

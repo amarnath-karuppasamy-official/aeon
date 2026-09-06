@@ -207,3 +207,39 @@ export function mountB(container, flag) { return render(B(flag), container); }
   assert.equal(containerA.querySelector('#a').textContent, '2');
   assert.ok(containerB.querySelector('#b').hasAttribute('hidden'));
 });
+
+test('(g) a nested html`` call inside an outer template (a real, documented composition pattern) precompiles without corrupting the file', async () => {
+  const entry = writeFixture(
+    'nested.js',
+    `
+import { html, render, signal } from '@aeon-framework/core';
+
+function Badge(label) {
+  return html\`<b id="badge">\${label}</b>\`;
+}
+
+export function Outer() {
+  const n = signal(1);
+  return html\`<div id="outer">before \${() => html\`<i id="inner">\${n.value}</i>\`} after \${Badge('x')}</div>\`;
+}
+
+export function mountApp(container) {
+  return render(Outer(), container);
+}
+`
+  );
+  const outfile = path.join(tmpDir, 'nested.out.js');
+  const code = await bundle(entry, outfile, { withPlugin: true });
+
+  // The outer call site is precompiled; the file must remain valid,
+  // runnable JS either way (previously the outer edit's stale `end` offset,
+  // invalidated by the inner edit shifting the string, spliced into the
+  // middle of unrelated source and produced a syntax error here).
+  assert.match(code, /__aeonPrecompiled:\s*{/);
+
+  const mod = await import(pathToFileURL(outfile).href);
+  const container = document.createElement('div');
+  mod.mountApp(container);
+  assert.equal(container.querySelector('#outer #inner').textContent, '1');
+  assert.equal(container.querySelector('#outer #badge').textContent, 'x');
+});
