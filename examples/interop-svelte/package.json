@@ -1,0 +1,11 @@
+{
+  "name": "aeon-interop-svelte-example",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "@aeon-framework/core": "*",
+    "@aeon-framework/interop": "*",
+    "svelte": "^5.0.0"
+  }
+}

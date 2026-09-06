@@ -1,7 +1,7 @@
 {
   "name": "@aeon-framework/interop",
-  "version": "0.1.1",
-  "description": "Embed Aeon components inside another framework's tree, or read Aeon signals from it. Aeon mounts to a real DOM node it fully owns, so this is a plain escape hatch, not a virtual-DOM reconciliation bridge.",
+  "version": "0.2.0",
+  "description": "Embed Aeon components inside another framework's tree (React/Vue/Svelte/Angular) or read Aeon signals from it, and the reverse: embed a React/Vue/Svelte/Angular component inside an Aeon `html` template. Aeon mounts to a real DOM node it fully owns, so this is a plain escape hatch, not a virtual-DOM reconciliation bridge.",
   "type": "module",
   "sideEffects": false,
   "engines": {
@@ -16,6 +16,14 @@
       "types": "./src/vue.d.ts",
       "default": "./src/vue.js"
     },
+    "./svelte": {
+      "types": "./src/svelte.d.ts",
+      "default": "./src/svelte.js"
+    },
+    "./angular": {
+      "types": "./src/angular.d.ts",
+      "default": "./src/angular.js"
+    },
     "./vanilla": {
       "types": "./src/vanilla.d.ts",
       "default": "./src/vanilla.js"
@@ -23,14 +31,30 @@
   },
   "peerDependencies": {
     "@aeon-framework/core": "^0.1.0",
+    "@angular/core": ">=14",
     "react": ">=17",
+    "react-dom": ">=17",
+    "rxjs": ">=7",
+    "svelte": ">=5",
     "vue": ">=3"
   },
   "peerDependenciesMeta": {
     "react": {
       "optional": true
     },
+    "react-dom": {
+      "optional": true
+    },
     "vue": {
+      "optional": true
+    },
+    "svelte": {
+      "optional": true
+    },
+    "@angular/core": {
+      "optional": true
+    },
+    "rxjs": {
       "optional": true
     }
   },

@@ -10,3 +10,12 @@ export function AeonView<P>(args: { component: Component<P>; props?: P }): React
 /** Read a live Aeon signal from React code; re-renders the component on
  * change via useSyncExternalStore. */
 export function useAeonSignal<T>(sig: Signal<T> | ReadonlySignal<T>): T;
+
+/** Mount a real React component as a leaf inside an Aeon `html` template.
+ * `propsFn` is read inside an Aeon effect, so any signal it reads
+ * re-renders the React component with fresh props via React's own
+ * `root.render()` — no remounting. */
+export function hostReact<P extends Record<string, unknown>>(
+  component: (props: P) => ReactElement | null,
+  propsFn: P | (() => P)
+): { node: Node; dispose: () => void };

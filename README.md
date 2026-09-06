@@ -81,7 +81,7 @@ npm run portability-check    # signals work with zero DOM, checked on Node + Bun
 | `@aeon-framework/forms` | `control`, `group`, composable `validators` |
 | `@aeon-framework/di` | `createToken`, `provide`, `inject`, scoped `Container` |
 | `@aeon-framework/cli` | `aeon new / dev / build / prerender / migrate / generate / check` (alias `g`) — esbuild-powered, zero config |
-| `@aeon-framework/interop` | Embed Aeon inside React/Vue (and vice versa) — `AeonView`, `useAeonSignal` |
+| `@aeon-framework/interop` | Embed Aeon inside React/Vue/Svelte/Angular (and vice versa) — `AeonView`, `useAeonSignal`, `aeonMount`, `AeonHostDirective`, `hostReact`/`hostVue`/`hostSvelte`/`hostAngular` |
 | `@aeon-framework/migrate` | Codemod: converts a defined subset of React function components to Aeon |
 | `@aeon-framework/http` | `resource()` (reactive fetch), `mutation()` (imperative actions), plain `http.*` fetch helpers |
 | `@aeon-framework/testing` | `render()`/`fireEvent`/`cleanup()` — mount a component into a real (Happy DOM) document and test it |
@@ -768,9 +768,16 @@ and reload VS Code.
 Aeon owns a real DOM node, not a virtual one, so embedding it inside another
 framework is just "call `mount()` when the host mounts, call `dispose()` when
 the host unmounts" — no reconciliation conflict is possible because Aeon
-never touches nodes it wasn't given.
+never touches nodes it wasn't given. `@aeon-framework/interop` covers this in
+**both directions**, for **React, Vue, Svelte, and Angular**: Aeon as a leaf
+inside the host framework's tree, and the host framework's own component as
+a leaf inside an Aeon `html` template. Each framework gets its own entry
+point (`@aeon-framework/interop/react`, `/vue`, `/svelte`, `/angular`), so an
+app that only uses one framework never pulls in code for the others.
 
-**Aeon inside React:**
+### Aeon inside a host framework
+
+**React:**
 
 ```jsx
 import { AeonView, useAeonSignal } from '@aeon-framework/interop/react';
@@ -787,21 +794,132 @@ function Page() {
 }
 ```
 
-**Aeon inside Vue** works the same way (`@aeon-framework/interop/vue`, a
+**Vue** works the same way (`@aeon-framework/interop/vue`, a
 `defineComponent` wrapper plus a `useAeonSignal` composable built on
-`shallowRef`). A **vanilla** entry point (`@aeon-framework/interop/vanilla`) covers any
+`shallowRef`).
+
+**Svelte** (`@aeon-framework/interop/svelte`) ships a Svelte *action* — no
+`.svelte` file, so this package never needs the Svelte compiler to build or
+ship — plus a store adapter built purely on Aeon's own `effect()`:
+
+```svelte
+<script>
+  import { aeonMount, aeonSignalStore } from '@aeon-framework/interop/svelte';
+  import { AeonCounter, sharedCount } from './aeon-counter.js';
+  const count = aeonSignalStore(sharedCount); // a real Svelte store
+</script>
+
+<p>Svelte sees: {$count}</p>
+<div use:aeonMount={{ component: AeonCounter }}></div>
+```
+
+**Angular** (`@aeon-framework/interop/angular`) ships a standalone
+`AeonHostDirective` and a `toObservable()` adapter onto RxJS, Angular's own
+native reactive primitive:
+
+```ts
+import { AeonHostDirective, toObservable } from '@aeon-framework/interop/angular';
+import { sharedCount } from './aeon-counter.js';
+
+@Component({
+  standalone: true,
+  imports: [AeonHostDirective, AsyncPipe],
+  template: `
+    <p>Angular sees: {{ (count$ | async) }}</p>
+    <div aeonHost [component]="AeonCounter"></div>
+  `,
+})
+class Page {
+  AeonCounter = AeonCounter;
+  count$ = toObservable(sharedCount);
+}
+```
+
+A **vanilla** entry point (`@aeon-framework/interop/vanilla`) covers any
 framework without a dedicated adapter: `attach(container, Component, props)`
 returns a dispose function you call on teardown.
 
-Verified end to end in `examples/interop-react` and `examples/interop-vue`:
-the host framework's own state stays isolated from Aeon's, and
-`useAeonSignal` correctly mirrors an Aeon signal's value back into the host's
-own re-render mechanism (`scripts/verify-interop-react.mjs`,
-`scripts/verify-interop-vue.mjs`).
+Verified end to end in `examples/interop-react`, `examples/interop-vue`, and
+`examples/interop-svelte`: the host framework's own state stays isolated
+from Aeon's, and each `useAeonSignal`/`aeonSignalStore`/`toObservable`
+correctly mirrors an Aeon signal's value back into the host's own re-render
+mechanism (`scripts/verify-interop-react.mjs`,
+`scripts/verify-interop-vue.mjs`, `scripts/verify-interop-svelte.mjs`).
+Angular's directive is verified differently — see "A note on Angular's
+verification scope" below.
 
-The reverse direction — Aeon reading a *host* framework's state — isn't
-built, because it isn't Aeon's problem to solve: pass values in as props to
-`AeonView`/`attach()` and update them the normal way for that framework.
+### A host framework's component inside Aeon
+
+The reverse direction: `host<Framework>(Component, propsFn)` mounts a real
+React/Vue/Svelte/Angular component and hands back `{ node, dispose }` —
+`node` is a plain DOM `Node`, usable directly as a value inside an Aeon
+`html` template. `propsFn` is read inside an Aeon `effect()`, so any Aeon
+signal it reads keeps the hosted component's props live, with no
+remounting — each framework's own incremental update path does the work
+(React's `root.render()`, Vue's `render(vnode, container)`, Svelte's
+`svelte/legacy` class-component `.$set()`, Angular's `setInput()` +
+`detectChanges()`):
+
+```js
+import { onCleanup } from '@aeon-framework/core';
+import { hostReact } from '@aeon-framework/interop/react';
+
+function MyAeonComponent() {
+  const { node, dispose } = hostReact(ReactCounter, () => ({ count: count.value }));
+  onCleanup(dispose);
+  return html`<div>${node}</div>`;
+}
+```
+
+`hostVue`, `hostSvelte` follow the identical two-line shape. `hostAngular`
+is the one exception, and it's a real, inherent asymmetry rather than an
+oversight: **Angular has no ambient "current application"** the way React
+just needs `document`, Vue just needs a container node, and Svelte just
+needs a target element — an Angular component can only be created through
+an `EnvironmentInjector`, which only exists once some Angular app has
+bootstrapped. So `hostAngular(Component, environmentInjector, propsFn)`
+takes that injector explicitly (e.g. `ApplicationRef.injector`, or
+`inject(EnvironmentInjector)` from inside Angular code that already has
+one) — three arguments instead of two.
+
+Verified end to end, real prop changes over time via a real Aeon signal,
+through real Chromium: `examples/interop-react`'s `reverse.html` +
+`scripts/verify-interop-react-reverse.mjs` (`hostReact`),
+`examples/interop-vue`'s `reverse.html` + `scripts/verify-interop-vue-reverse.mjs`
+(`hostVue`), and `examples/interop-svelte`'s `reverse.html` (exercised by
+the same `scripts/verify-interop-svelte.mjs` as the forward direction,
+`hostSvelte`).
+
+**Svelte version note:** `hostSvelte` is verified against the real,
+installed Svelte 5.57.0, via `svelte/legacy`'s `createClassComponent` —
+plain Svelte 5 `mount()` only reads its `props` argument once at creation
+(mutating that object afterwards does nothing observable), so genuine
+incremental prop updates without remounting need the `svelte/legacy`
+compatibility layer, which still ships as part of Svelte 5 itself (no extra
+dependency). Not tested against Svelte 3/4; `new Component({ target, props })`
++ `.$set(props)` + `.$destroy()` is the direct equivalent for those
+versions.
+
+### A note on Angular's verification scope
+
+Angular's own compiler/`TestBed` harness is heavy machinery this repo's
+sandbox doesn't run through a full `ng build`. What's real here instead: a
+genuine finding made while building this — `@angular/core` +
+`@angular/platform-browser-dynamic` run directly under plain Node with a DOM
+global (`happy-dom`) and `zone.js`, no Angular CLI needed, once decorators
+are applied as plain function calls (`Input()(proto, 'name')` then
+`Directive({...})(Klass)` — exactly what TypeScript's own decorator
+transform compiles `@Directive() class Foo {}` down to). `packages/interop/test/angular.test.mjs`
+uses this to drive `AeonHostDirective` through a **real Angular template
+binding** (`[aeonHost] [component] [props]`, compiled by the real
+`@angular/compiler` JIT compiler, bootstrapped for real via
+`bootstrapApplication()`, change-detected for real) — not just direct calls
+on the class — and drives `toObservable`/`hostAngular` the same honest way:
+real RxJS subscriptions, a real `EnvironmentInjector`, real `setInput()` +
+`detectChanges()`. What this does **not** exercise: Angular CLI's AOT
+production pipeline, and Angular's own `TestBed` test harness — neither was
+needed to get real coverage, so neither was pulled in. Run it yourself:
+`node --test packages/interop/test/angular.test.mjs`.
 
 ## Migrating from React
 
@@ -910,9 +1028,13 @@ validation all confirmed working end to end):
 - Three verified portability modes: bundler, zero-build native ESM, and a
   plain `<script>` global — plus a DOM-free reactive core that runs
   standalone on Node and Bun
-- Bidirectional interop with React and Vue (`@aeon-framework/interop`), verified with
-  headless-browser tests that check both isolation and signal sync in both
-  directions
+- Bidirectional interop with React, Vue, Svelte, and Angular
+  (`@aeon-framework/interop`) — Aeon as a leaf inside each host framework
+  and each host framework's component as a leaf inside Aeon — verified with
+  real headless-Chromium tests (React/Vue/Svelte) that check isolation and
+  live signal/prop sync in both directions, plus real (non-TestBed) Angular
+  unit tests for the Angular pieces (see the README's Interop section for
+  the honest scope note on Angular)
 - A scoped, tested React→Aeon migration codemod (`@aeon-framework/migrate` /
   `aeon migrate`) that converts a defined subset correctly and safely bails
   out — leaving the original untouched — on everything outside that subset
@@ -1011,7 +1133,7 @@ packages/
   forms/    reactive forms
   di/       dependency injection
   cli/      scaffold, dev server, build/prerender/migrate (+ template/ and template-ts/)
-  interop/  embed Aeon in React/Vue and vice versa
+  interop/  embed Aeon in React/Vue/Svelte/Angular and vice versa
   migrate/  React → Aeon codemod (Babel-based)
   http/     resource()/mutation() — signals over fetch
   testing/  render()/fireEvent/cleanup() on a real (Happy DOM) document
@@ -1028,6 +1150,7 @@ examples/
   standalone-drop-in/   @aeon-framework/core via a plain <script> tag
   interop-react/        Aeon embedded inside a React app, both directions
   interop-vue/          Aeon embedded inside a Vue app, both directions
+  interop-svelte/       Aeon embedded inside a Svelte app, both directions
   migrate-verify/        real, unedited codemod output, verified in-browser
 benchmark/
   aeon/ react/ preact/ solid/ vue/   identical create/update/clear stress test
@@ -1036,8 +1159,12 @@ dist-standalone/
   aeon.core.global.js   core alone, smaller
 scripts/
   verify.mjs                       headless-browser check of the built demo app
-  verify-interop-react.mjs         checks React↔Aeon interop, both directions
-  verify-interop-vue.mjs           checks Vue↔Aeon interop, both directions
+  verify-interop-react.mjs         checks React↔Aeon interop (forward direction + signal sync)
+  verify-interop-react-reverse.mjs checks hostReact (React component hosted inside Aeon)
+  verify-interop-vue.mjs           checks Vue↔Aeon interop (forward direction + signal sync)
+  verify-interop-vue-reverse.mjs   checks hostVue (Vue component hosted inside Aeon)
+  verify-interop-svelte.mjs        checks Svelte↔Aeon interop, both directions
+  serve-interop.mjs                shared esbuild dev server for every interop example above
   verify-migrate.mjs               drives real codemod output in a browser
   verify-benchmark-correctness.mjs checks all 5 benchmark apps produce identical results
   run-benchmark.mjs                the actual timing harness (median of 7 rounds)

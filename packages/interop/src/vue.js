@@ -1,4 +1,4 @@
-import { h, defineComponent, ref as vueRef, onMounted, onUnmounted, shallowRef } from 'vue';
+import { h, defineComponent, ref as vueRef, onMounted, onUnmounted, shallowRef, render as vueRender } from 'vue';
 import { effect } from '@aeon-framework/core';
 import { attach } from './vanilla.js';
 
@@ -27,4 +27,30 @@ export function useAeonSignal(sig) {
   });
   onUnmounted(stop);
   return state;
+}
+
+/**
+ * Mount a real Vue component as a leaf inside an Aeon `html` template, using
+ * Vue's own low-level `render(vnode, container)` API (Vue's documented
+ * pattern for embedding into a non-Vue app — see
+ * https://vuejs.org/api/render-function.html#render — deliberately not a
+ * whole `createApp()` per prop update, which would be wasteful and remount
+ * the component every time). Each Aeon-effect re-run just calls `render()`
+ * again with a fresh vnode; Vue patches the existing instance in place.
+ * `render(null, container)` (used in dispose) is Vue's own documented way
+ * to unmount.
+ */
+export function hostVue(Component, propsFn) {
+  const node = document.createElement('div');
+  const stop = effect(() => {
+    const props = typeof propsFn === 'function' ? propsFn() : propsFn;
+    vueRender(h(Component, props), node);
+  });
+  return {
+    node,
+    dispose: () => {
+      stop();
+      vueRender(null, node);
+    },
+  };
 }
