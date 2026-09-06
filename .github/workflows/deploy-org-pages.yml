@@ -69,17 +69,28 @@ jobs:
         env:
           PAGES_DEPLOY_TOKEN: ${{ secrets.PAGES_DEPLOY_TOKEN }}
         run: |
+          set -x
           if [ -z "$PAGES_DEPLOY_TOKEN" ]; then
             echo "::error::PAGES_DEPLOY_TOKEN secret is not set on this repo (Settings -> Secrets and variables -> Actions). Skipping publish."
             exit 1
           fi
+
           rm -rf /tmp/pages-deploy
-          git clone --depth 1 "https://x-access-token:${PAGES_DEPLOY_TOKEN}@github.com/Aeon-framework/aeon-framework.github.io.git" /tmp/pages-deploy || \
-            (mkdir -p /tmp/pages-deploy && cd /tmp/pages-deploy && git init -q && git remote add origin "https://x-access-token:${PAGES_DEPLOY_TOKEN}@github.com/Aeon-framework/aeon-framework.github.io.git")
-          # Clear everything except .git so removed pages don't linger.
-          find /tmp/pages-deploy -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+          mkdir -p /tmp/pages-deploy
+          cd /tmp/pages-deploy
+          git init -q -b main
+          git remote add origin "https://x-access-token:${PAGES_DEPLOY_TOKEN}@github.com/Aeon-framework/aeon-framework.github.io.git"
+          git config user.email "aeon-pages-bot@users.noreply.github.com"
+          git config user.name "aeon-pages-bot"
+          # Pull any existing history if the repo isn't empty (fine either way
+          # if it is — an empty/never-pushed repo has no main to fetch, and
+          # `git fetch` failing here is not fatal, this is our own repo we
+          # fully own and force-push below regardless).
+          git fetch origin main 2>/dev/null && git reset --soft origin/main || true
+
+          cd "$GITHUB_WORKSPACE"
           cp -r site/dist/. /tmp/pages-deploy/
-          cat > /tmp/pages-deploy/README.md <<'EOF'
+          cat > /tmp/pages-deploy/README.md <<'DOC'
           # aeon-framework.github.io
 
           This repo is the **deployed output** of Aeon's landing page + docs site,
@@ -89,12 +100,13 @@ jobs:
           publish.
 
           Real source: https://github.com/amarnath-karuppasamy-official/aeon/tree/main/site
-          EOF
+          DOC
+
           cd /tmp/pages-deploy
-          git config user.email "aeon-pages-bot@users.noreply.github.com"
-          git config user.name "aeon-pages-bot"
-          git checkout -B main
           git add -A
-          git diff --cached --quiet && echo "No changes to publish." && exit 0
-          git commit -m "Publish site from aeon@${GITHUB_SHA}"
+          if git diff --cached --quiet; then
+            echo "No changes to publish."
+          else
+            git commit -m "Publish site from aeon@${GITHUB_SHA}"
+          fi
           git push -f origin main
