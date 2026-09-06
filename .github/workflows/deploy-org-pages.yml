@@ -1,0 +1,100 @@
+name: Publish site to aeon-framework.github.io
+
+# Builds site/ a second time with its base path rewritten from the project
+# page's "/aeon" prefix to root ("/"), then pushes the static output to the
+# separate Aeon-framework/aeon-framework.github.io repo, which GitHub Pages
+# serves at https://aeon-framework.github.io/ with no sub-path.
+#
+# Why a second build instead of reusing deploy-pages.yml's output: that
+# workflow (deploy-pages.yml) builds site/ for THIS repo's own project-page
+# deployment at amarnath-karuppasamy-official.github.io/aeon/, where every
+# route and asset path is deliberately prefixed with /aeon (see
+# site/src/router.js's BASE constant and its own header comment) because
+# @aeon-framework/router has no "basename" concept yet and matches
+# window.location.pathname directly. A user/org page repo has no such
+# prefix, so this job patches BASE to '' and the <script src> in
+# site/index.html to match, builds fresh, and discards those two working-tree
+# edits afterward — never committing them back here.
+#
+# Requires a repository secret PAGES_DEPLOY_TOKEN: a GitHub Personal Access
+# Token (classic, "repo" scope is enough) with push access to
+# Aeon-framework/aeon-framework.github.io. Add it under this repo's Settings
+# -> Secrets and variables -> Actions -> New repository secret.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'packages/core/**'
+      - 'packages/router/**'
+      - 'packages/ssg/**'
+      - 'packages/ssr/**'
+      - 'packages/cli/**'
+      - '.github/workflows/deploy-org-pages.yml'
+  workflow_dispatch: {}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --workspaces --include-workspace-root
+
+      - name: Rewrite site base path to root for the org/user Pages repo
+        run: |
+          sed -i "s|export const BASE = '/aeon';|export const BASE = '';|" site/src/router.js
+          sed -i 's|src="/aeon/main.js"|src="/main.js"|' site/index.html
+          grep -n "BASE = " site/src/router.js
+          grep -n "main.js" site/index.html
+
+      - name: Prerender site (root base path)
+        run: |
+          rm -rf site/dist site/.aeon
+          node packages/cli/bin/aeon.mjs prerender site
+
+      - name: Verify build output looks right
+        run: |
+          test -f site/dist/index.html
+          test -f site/dist/main.js
+          test -f site/dist/docs/index.html
+          grep -q "__aeonPrecompiled" site/dist/main.js
+
+      - name: Push static output to Aeon-framework/aeon-framework.github.io
+        env:
+          PAGES_DEPLOY_TOKEN: ${{ secrets.PAGES_DEPLOY_TOKEN }}
+        run: |
+          if [ -z "$PAGES_DEPLOY_TOKEN" ]; then
+            echo "::error::PAGES_DEPLOY_TOKEN secret is not set on this repo (Settings -> Secrets and variables -> Actions). Skipping publish."
+            exit 1
+          fi
+          rm -rf /tmp/pages-deploy
+          git clone --depth 1 "https://x-access-token:${PAGES_DEPLOY_TOKEN}@github.com/Aeon-framework/aeon-framework.github.io.git" /tmp/pages-deploy || \
+            (mkdir -p /tmp/pages-deploy && cd /tmp/pages-deploy && git init -q && git remote add origin "https://x-access-token:${PAGES_DEPLOY_TOKEN}@github.com/Aeon-framework/aeon-framework.github.io.git")
+          # Clear everything except .git so removed pages don't linger.
+          find /tmp/pages-deploy -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+          cp -r site/dist/. /tmp/pages-deploy/
+          cat > /tmp/pages-deploy/README.md <<'EOF'
+          # aeon-framework.github.io
+
+          This repo is the **deployed output** of Aeon's landing page + docs site,
+          published automatically by the `aeon` monorepo's
+          `.github/workflows/deploy-org-pages.yml` on every relevant push to
+          `main`. Don't hand-edit files here — they'll be overwritten on the next
+          publish.
+
+          Real source: https://github.com/amarnath-karuppasamy-official/aeon/tree/main/site
+          EOF
+          cd /tmp/pages-deploy
+          git config user.email "aeon-pages-bot@users.noreply.github.com"
+          git config user.name "aeon-pages-bot"
+          git checkout -B main
+          git add -A
+          git diff --cached --quiet && echo "No changes to publish." && exit 0
+          git commit -m "Publish site from aeon@${GITHUB_SHA}"
+          git push -f origin main
