@@ -1,7 +1,7 @@
 {
   "name": "aeon-site",
   "private": true,
-  "version": "0.1.4",
+  "version": "0.1.5",
   "type": "module",
   "description": "Aeon's marketing + docs site (aeon.dev-style), built as a real Aeon app and prerendered with @aeon-framework/ssg.",
   "dependencies": {
