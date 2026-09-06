@@ -340,3 +340,29 @@ test('hydrate() correctly wires a sibling component whose template\'s own leadin
 
   dispose();
 });
+
+test('a case-sensitive property binding (`.innerHTML=`) sets the real property, not a lowercased no-op', () => {
+  // HTML attribute names are parse-case-insensitive: `template.innerHTML =
+  // htmlString` (used internally by compile() to build the clonable
+  // <template>) lowercases every attribute name, including bind-marker
+  // attributes like `.innerHTML="aeon:salt:0aeon"`. If the part-descriptor
+  // walk ever reads the binding's name back off the parsed attribute
+  // instead of the original (pre-parse) template string, `.innerHTML`
+  // becomes `.innerhtml` and `el.innerhtml = value` is a silent no-op —
+  // the element renders with no children at all instead of the intended
+  // markup. This regression shipped on the real docs/landing site: every
+  // <code> sample rendered as an empty `<code></code>`.
+  function Highlighted({ markup }) {
+    return html`<pre><code .innerHTML=${markup}></code></pre>`;
+  }
+
+  const container = document.createElement('div');
+  const dispose = mount(() => Highlighted({ markup: '<span class="tok-kw">const</span> x' }), container);
+
+  const code = container.querySelector('code');
+  assert.ok(code, 'the <code> element must exist');
+  assert.equal(code.innerHTML, '<span class="tok-kw">const</span> x');
+  assert.equal(code.querySelector('span.tok-kw')?.textContent, 'const');
+
+  dispose();
+});

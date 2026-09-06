@@ -62,11 +62,24 @@ export function html(strings, ...values) {
 function compile(strings) {
   const salt = templateSalt(strings);
   let htmlString = '';
+  // `template.innerHTML = htmlString` below parses through the HTML parser,
+  // which lowercases every attribute name (attribute names are HTML-parse
+  // case-insensitive). That's invisible for `attribute`/`boolean`/`event`
+  // bindings (their names are conventionally all-lowercase already), but a
+  // `property` binding's name IS case-sensitive JS (`.innerHTML`,
+  // `.tabIndex`, `.readOnly`, ...) — reading it back off the parsed
+  // `attr.name` in walkForParts would silently set the wrong (nonexistent,
+  // all-lowercase) property and do nothing. So the exact-case name is
+  // recorded here, from the un-parsed template string, keyed by binding
+  // index, and walkForParts prefers it over the (possibly lowercased)
+  // parsed attribute name.
+  const attrNames = new Map();
   for (let i = 0; i < strings.length; i++) {
     htmlString += strings[i];
     if (i < strings.length - 1) {
       const attrMatch = attrBindRe.exec(strings[i]);
       if (attrMatch) {
+        attrNames.set(i, attrMatch[1]);
         // Quoted (`name="`) — the closing quote already lives in the next chunk.
         // Unquoted (`name=`) — wrap the marker in quotes ourselves so the HTML stays valid.
         htmlString += attrMatch[2] ? `${MARK}:${salt}:${i}${MARK}` : `"${MARK}:${salt}:${i}${MARK}"`;
@@ -87,31 +100,35 @@ function compile(strings) {
   // per-instance removeAttribute pass either. This is the difference between
   // "cheap enough to clone 1,000 times a frame" and not.
   const partDescriptors = [];
-  walkForParts(template.content, [], partDescriptors);
+  walkForParts(template.content, [], partDescriptors, attrNames);
   return { template, partDescriptors };
 }
 
-function walkForParts(node, path, out) {
+function walkForParts(node, path, out, attrNames) {
   if (node.nodeType === 1) {
     // Element: scan attributes once, stripping bind markers from the
     // template's own content so every clone is already clean.
     for (const attr of [...node.attributes]) {
       const m = bindTokenRe.exec(attr.value);
       if (!m) continue;
-      let name = attr.name;
+      const index = Number(m[2]);
+      // Prefer the exact-case name recorded pre-parse (see compile()); only
+      // fall back to the parsed (possibly lowercased) attr.name when it's
+      // unavailable, e.g. a precompiled template loaded without that map.
+      let name = (attrNames && attrNames.get(index)) || attr.name;
       let kind = 'attribute';
       if (name[0] === '@') { kind = 'event'; name = name.slice(1); }
       else if (name[0] === '.') { kind = 'property'; name = name.slice(1); }
       else if (name[0] === '?') { kind = 'boolean'; name = name.slice(1); }
       node.removeAttribute(attr.name);
-      out.push({ path, index: Number(m[2]), kind, name });
+      out.push({ path, index, kind, name });
     }
   } else if (node.nodeType === 8) {
     const m = bindTokenRe.exec(node.data);
     if (m) out.push({ path, index: Number(m[2]), kind: 'node' });
   }
   const children = node.childNodes;
-  for (let i = 0; i < children.length; i++) walkForParts(children[i], [...path, i], out);
+  for (let i = 0; i < children.length; i++) walkForParts(children[i], [...path, i], out, attrNames);
 }
 
 function getNodeAtPath(root, path) {
