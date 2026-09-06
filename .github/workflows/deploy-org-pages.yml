@@ -78,6 +78,14 @@ jobs:
             exit 1
           fi
 
+          # Diagnostic only (never prints the value itself): length and
+          # first/last 4 chars, to catch stray whitespace/newlines or a
+          # wrong-looking prefix without exposing the secret.
+          TOKLEN=$(printf '%s' "$PAGES_DEPLOY_TOKEN" | wc -c)
+          TOKHEAD=$(printf '%s' "$PAGES_DEPLOY_TOKEN" | head -c 4)
+          TOKTAIL=$(printf '%s' "$PAGES_DEPLOY_TOKEN" | tail -c 4)
+          echo "::notice::token diagnostic: length=$TOKLEN head='$TOKHEAD' tail='$TOKTAIL'"
+
           rm -rf /tmp/pages-deploy
           mkdir -p /tmp/pages-deploy
           cd /tmp/pages-deploy
