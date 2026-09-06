@@ -14,6 +14,9 @@ import { checkBindings } from './check-bindings.js';
 import { checkUnusedImports } from './check-imports.js';
 import { checkRoutes } from './check-routes.js';
 
+export { aeonPrecompile } from './esbuild-plugin.js';
+export { precompileTemplate } from './precompile.js';
+
 const CODE_EXTENSIONS = new Set(['.js', '.jsx', '.ts', '.tsx']);
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.aeon']);
 

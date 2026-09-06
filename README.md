@@ -91,7 +91,7 @@ npm run portability-check    # signals work with zero DOM, checked on Node + Bun
 | `@aeon-framework/i18n` | `locale` signal, `t(key, params)` interpolation + pluralization, `loadMessages()`, fallback locale chain |
 | `@aeon-framework/devtools` | `attachDevtools()` / `mountDevtoolsOverlay()` — an in-page (not a browser extension) live signal inspector |
 | `@aeon-framework/mcp` | `aeon-mcp` — an MCP server for AI coding assistants: code generation, docs search, conventions, project inspection, and real-compiler-backed template explanation (see [MCP server](#mcp-server)) |
-| `@aeon-framework/compiler` | `analyzeProject()` — whole-project static analysis powering `aeon check`: real binding-kind footguns, unused `@aeon-framework/*` imports, unreachable routes (see [Static analysis](#static-analysis)) |
+| `@aeon-framework/compiler` | `analyzeProject()` — whole-project static analysis powering `aeon check`: real binding-kind footguns, unused `@aeon-framework/*` imports, unreachable routes (see [Static analysis](#static-analysis)); `aeonPrecompile()` — the esbuild plugin behind `aeon build`'s compile-time binding optimization (see [Compile-time optimization](#compile-time-optimization-aot-milestone-2)) |
 | `create-aeon` | `npm create aeon@latest my-app` — the zero-install scaffolder |
 
 Every package ships hand-written `.d.ts` declarations — TypeScript projects get full autocomplete and type-checking with no separate `@types/*` package, and no build step generates them (they're maintained by hand alongside the JS, and verified against real `tsc` runs, not just eyeballed).
@@ -555,10 +555,49 @@ Exits non-zero when any `error`-severity finding exists (so it's CI-friendly
 as a build gate); `warning` findings print but don't fail the run.
 
 **What this genuinely is not (yet):** this is static *analysis* — it finds
-real mistakes before runtime — not compile-time binding optimization
-(templates are still tagged-literal + runtime-parsed, same as today) and not
-whole-program dead-code elimination. Those are further-out milestones on the
-same road, tracked honestly in "What's real vs. what's next" below.
+real mistakes before runtime. Compile-time binding optimization is now real
+too (see the next section); whole-program dead-code elimination is still not
+built. Tracked honestly in "What's real vs. what's next" below.
+
+## Compile-time optimization (AOT milestone 2)
+
+`aeon build` (production builds only — never `aeon dev`) now runs an esbuild
+plugin, `aeonPrecompile()` (`@aeon-framework/compiler`), over the app's own
+source. For every `html\`...\`` call site it can find and safely handle, it
+runs Aeon's REAL template compiler — the exact same `compile()` function
+`packages/core/src/dom.js` runs at render time (via a throwaway happy-dom
+document, the same trick `explain_template`/`aeon check` already use) — once,
+at build time, and attaches the result to the call site so the shipped
+bundle looks roughly like:
+
+```js
+html(Object.assign(["<div>", "</div>"], { __aeonPrecompiled: { html: "...", parts: [...] } }), x)
+```
+
+`getTemplate()` in core (`packages/core/src/dom.js`) checks for
+`strings.__aeonPrecompiled` first and, when present, builds the template
+straight from the precomputed `{ html, parts }` instead of calling
+`walkForParts()` — the tree-walk that finds every binding in a template.
+
+**What this actually buys you:** `walkForParts()` already only ever ran
+*once per unique template shape per process* (cached in a `WeakMap`), even
+without this plugin — so the honest win is not "a tree-walk that used to
+happen repeatedly now happens once." It's "the one tree-walk it already only
+ran once now runs on your build machine instead of in every user's browser
+on first render" — faster cold start / time-to-interactive, nothing more.
+
+**What this explicitly does NOT do:**
+- It does not eliminate the `<template>` element's parsing or per-render
+  cloning — that's real DOM work every render still pays for, precompiled or
+  not.
+- It is not whole-program dead-code elimination. That remains a further-out,
+  unbuilt milestone (see "What's real vs. what's next" below).
+- It never touches `aeon dev` — the dev server keeps today's simple,
+  unoptimized path; this is a production-build-only optimization.
+- It is fully backward compatible: any template it can't safely precompile
+  (or any project that isn't built with `aeon build`'s plugin at all) falls
+  straight through to the exact, unchanged `compile()` path — same runtime
+  behavior, same output, every time.
 
 ## Devtools
 
@@ -930,27 +969,33 @@ validation all confirmed working end to end):
   signal overlay — `attachDevtools()`/`mountDevtoolsOverlay()` plus a
   `track()`/`untrack()` registry, tested with Happy DOM confirming the
   panel's DOM text updates when a tracked signal's value changes
-- `@aeon-framework/compiler`: **the first real milestone toward an AOT
-  compiler** — whole-project static analysis (`aeon check`), not runtime
-  binding optimization and not whole-program dead-code elimination (see
-  "Static analysis" above for the honest scope line). Real binding-kind
-  footguns via Aeon's actual compiler (reusing `explain_template`'s logic,
-  not a copy of it), unused `@aeon-framework/*` import detection, and
-  unreachable-route detection (duplicate paths, a non-last catch-all) proven
-  against `@aeon-framework/router`'s real `matchRoute()` first-match
-  semantics — tested against real fixture projects, including
-  false-positive checks (a correctly-used import, a legitimately-last
-  catch-all) and a real end-to-end run of the `aeon check` binary
+- `@aeon-framework/compiler`: **two real milestones toward an AOT
+  compiler**, still not the whole thing. Milestone 1: whole-project static
+  analysis (`aeon check`) — see "Static analysis" above for the honest scope
+  line. Real binding-kind footguns via Aeon's actual compiler (reusing
+  `explain_template`'s logic, not a copy of it), unused `@aeon-framework/*`
+  import detection, and unreachable-route detection (duplicate paths, a
+  non-last catch-all) proven against `@aeon-framework/router`'s real
+  `matchRoute()` first-match semantics — tested against real fixture
+  projects, including false-positive checks (a correctly-used import, a
+  legitimately-last catch-all) and a real end-to-end run of the `aeon check`
+  binary. Milestone 2: compile-time binding optimization — `aeon build`'s
+  `aeonPrecompile()` esbuild plugin runs the real `compile()` at build time
+  and lets `getTemplate()` skip `walkForParts()`'s tree-walk at runtime for
+  precompiled templates (see "Compile-time optimization" above for the
+  honest scope line — it does not skip `<template>` parsing/cloning) —
+  tested by actually building real fixture bundles with esbuild both with
+  and without the plugin and importing/running both to confirm identical DOM
+  output and identical interactive (signal-driven) behavior.
 
 Not yet built — the honest gap list for anything claiming to seriously
-compete with Angular: compile-time binding optimization and whole-program
-dead-code elimination (current templates are still tagged-literal +
-runtime-parsed — `@aeon-framework/compiler`'s static analysis pass above is
-a real first step toward a compiler, not the compiler itself), a real
-Chrome DevTools *extension* (`@aeon-framework/devtools` is an in-page
-overlay only, not a panel integrated into the browser's own DevTools), a
-migration codemod that covers more than the current `useState`-only subset,
-and — the actually hard part — an ecosystem and community.
+compete with Angular: whole-program dead-code elimination (milestone 3 —
+compile-time binding optimization, milestone 2, is now real; see
+"Compile-time optimization" above), a real Chrome DevTools *extension*
+(`@aeon-framework/devtools` is an in-page overlay only, not a panel
+integrated into the browser's own DevTools), a migration codemod that covers
+more than the current `useState`-only subset, and — the actually hard part —
+an ecosystem and community.
 
 The architecture here (signals, no vdom, plain functions over decorators) is
 a defensible bet on where the frameworks are heading; the distance to

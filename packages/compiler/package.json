@@ -1,7 +1,7 @@
 {
   "name": "@aeon-framework/compiler",
-  "version": "0.1.0",
-  "description": "Aeon static analysis: the first real milestone toward an AOT compiler — whole-project checks (real binding-kind validation, unused @aeon-framework/* imports, unreachable routes) powering `aeon check`. Not runtime binding optimization, not whole-program dead-code elimination.",
+  "version": "0.2.0",
+  "description": "Aeon AOT compiler: whole-project static analysis (real binding-kind validation, unused @aeon-framework/* imports, unreachable routes) powering `aeon check`, plus a build-time esbuild plugin (aeonPrecompile) that runs the real template compiler at build time so `aeon build` output skips one tree-walk per template shape on first render. Not whole-program dead-code elimination — that remains a further-out milestone.",
   "type": "module",
   "main": "./src/index.js",
   "exports": {
@@ -19,7 +19,10 @@
     "access": "public"
   },
   "dependencies": {
-    "@aeon-framework/mcp": "^0.1.0"
+    "@aeon-framework/mcp": "^0.1.0",
+    "acorn": "^8.14.0",
+    "esbuild": "^0.24.0",
+    "happy-dom": "^20.0.0"
   },
   "peerDependencies": {
     "@aeon-framework/core": "^0.1.0"

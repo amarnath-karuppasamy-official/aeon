@@ -28,3 +28,36 @@ export interface Finding {
  * the target project's code.
  */
 export function analyzeProject(args: { projectDir: string }): Promise<Finding[]>;
+
+/** One binding descriptor as recorded by Aeon's real `walkForParts()` tree-walk. */
+export interface PrecompiledPart {
+  path: number[];
+  index: number;
+  kind: 'node' | 'attribute' | 'property' | 'event' | 'boolean';
+  name?: string;
+}
+
+/** The precomputed shape core's `getTemplate()` fast path consumes. */
+export interface PrecompiledTemplate {
+  html: string;
+  parts: PrecompiledPart[];
+}
+
+/**
+ * Run Aeon's real runtime compiler (core's `compile()`) against a tagged
+ * template's cooked `strings` chunks at build time, via a throwaway
+ * happy-dom document. Used by `aeonPrecompile()`; also usable standalone.
+ */
+export function precompileTemplate(quasis: string[]): Promise<PrecompiledTemplate>;
+
+/**
+ * AOT milestone 2: an esbuild plugin for `aeon build`'s production client
+ * bundle. Rewrites `html`...`` ` call sites in the app's own source (never
+ * node_modules) so the runtime skips one `walkForParts()` tree-walk per
+ * template shape on first render. Does not change what code ships, does
+ * not skip `<template>` parsing/cloning, and never runs during `aeon dev`.
+ */
+export function aeonPrecompile(): {
+  name: 'aeon-precompile';
+  setup(build: unknown): void;
+};

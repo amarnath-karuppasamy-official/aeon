@@ -87,10 +87,32 @@ function getNodeAtPath(root, path) {
 
 function getTemplate(strings) {
   let info = templateCache.get(strings);
-  if (!info) {
+  if (info) return info;
+  // AOT fast path (milestone 2): a build-time plugin
+  // (@aeon-framework/compiler's aeonPrecompile()) can run the exact same
+  // walkForParts() tree-walk compile() does below, once, on the build
+  // machine, and attach its result directly to the call site's `strings`
+  // array as `strings.__aeonPrecompiled = { html, parts }`. When present we
+  // build the template straight from that precomputed HTML/part list and
+  // skip walkForParts() entirely — the browser never re-derives what the
+  // build already knows. This does NOT skip parsing/cloning the `<template>`
+  // itself (that's real DOM work a clone still needs), and it changes
+  // nothing observable: `template.innerHTML = precompiled.html` produces the
+  // identical stripped-marker markup compile() would have produced, and
+  // `precompiled.parts` is exactly the `partDescriptors` walkForParts()
+  // would have recorded. Anything without this property (the overwhelming
+  // majority of templates today, and any template the plugin couldn't
+  // safely handle) falls through to the untouched compile() path below,
+  // byte-for-byte as before this fast path existed.
+  const precompiled = strings.__aeonPrecompiled;
+  if (precompiled) {
+    const template = document.createElement('template');
+    template.innerHTML = precompiled.html;
+    info = { template, partDescriptors: precompiled.parts };
+  } else {
     info = compile(strings);
-    templateCache.set(strings, info);
   }
+  templateCache.set(strings, info);
   return info;
 }
 

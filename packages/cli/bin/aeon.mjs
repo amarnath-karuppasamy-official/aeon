@@ -100,6 +100,13 @@ async function dev(dir) {
 async function build(dir) {
   const { root, entry } = resolveApp(dir);
   const outdir = path.join(root, 'dist');
+  // AOT milestone 2 (production build only — never `aeon dev`): precompile
+  // every `html`...`` ` call site in the app's own source at build time, so
+  // the shipped bundle skips one tree-walk per template shape on first
+  // render. See @aeon-framework/compiler's esbuild-plugin.js and the
+  // README's "Compile-time optimization (AOT milestone 2)" section for the
+  // exact, honest scope of what this does and doesn't do.
+  const { aeonPrecompile } = await import('@aeon-framework/compiler');
   const result = await esbuild.build({
     entryPoints: [entry],
     bundle: true,
@@ -108,6 +115,7 @@ async function build(dir) {
     sourcemap: true,
     format: 'esm',
     metafile: true,
+    plugins: [aeonPrecompile()],
     // Matters for apps embedding React/Vue via @aeon-framework/interop — without this,
     // those packages bundle their (much larger) development builds.
     define: { 'process.env.NODE_ENV': '"production"' },
