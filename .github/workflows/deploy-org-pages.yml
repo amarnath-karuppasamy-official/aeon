@@ -71,7 +71,8 @@ jobs:
         env:
           PAGES_DEPLOY_TOKEN: ${{ secrets.PAGES_DEPLOY_TOKEN }}
         run: |
-          set -x
+          set +e
+
           if [ -z "$PAGES_DEPLOY_TOKEN" ]; then
             echo "::error::PAGES_DEPLOY_TOKEN secret is not set on this repo (Settings -> Secrets and variables -> Actions). Skipping publish."
             exit 1
@@ -84,11 +85,29 @@ jobs:
           git remote add origin "https://x-access-token:${PAGES_DEPLOY_TOKEN}@github.com/Aeon-framework/aeon-framework.github.io.git"
           git config user.email "aeon-pages-bot@users.noreply.github.com"
           git config user.name "aeon-pages-bot"
-          # Pull any existing history if the repo isn't empty (fine either way
-          # if it is — an empty/never-pushed repo has no main to fetch, and
-          # `git fetch` failing here is not fatal, this is our own repo we
-          # fully own and force-push below regardless).
-          git fetch origin main 2>/dev/null && git reset --soft origin/main || true
+
+          # Diagnostic: verify the token can even see the repo before trying
+          # to push. Its (redacted) output is surfaced as a ::error:: build
+          # annotation on failure so it's visible on the run summary page
+          # without needing to sign in to view raw logs.
+          LS_OUT=$(git ls-remote origin main 2>&1)
+          LS_CODE=$?
+          if [ $LS_CODE -ne 0 ]; then
+            SAFE=$(printf '%s' "$LS_OUT" | sed "s/${PAGES_DEPLOY_TOKEN}/REDACTED/g" | tr '\n' ' ')
+            echo "::error::git ls-remote failed (exit $LS_CODE): $SAFE"
+            exit 1
+          fi
+          echo "ls-remote ok: $LS_OUT"
+
+          # Pull any existing history if the repo isn't empty (fine either
+          # way if it is — an empty/never-pushed repo has no main to fetch).
+          FETCH_OUT=$(git fetch origin main 2>&1)
+          if [ $? -eq 0 ]; then
+            git reset --soft origin/main
+          else
+            SAFE=$(printf '%s' "$FETCH_OUT" | sed "s/${PAGES_DEPLOY_TOKEN}/REDACTED/g" | tr '\n' ' ')
+            echo "::warning::git fetch origin main failed, assuming empty repo: $SAFE"
+          fi
 
           cd "$GITHUB_WORKSPACE"
           cp -r site/dist/. /tmp/pages-deploy/
@@ -108,7 +127,15 @@ jobs:
           git add -A
           if git diff --cached --quiet; then
             echo "No changes to publish."
-          else
-            git commit -m "Publish site from aeon@${GITHUB_SHA}"
+            exit 0
           fi
-          git push -f origin main
+          git commit -m "Publish site from aeon@${GITHUB_SHA}"
+
+          PUSH_OUT=$(git push -f origin main 2>&1)
+          PUSH_CODE=$?
+          if [ $PUSH_CODE -ne 0 ]; then
+            SAFE=$(printf '%s' "$PUSH_OUT" | sed "s/${PAGES_DEPLOY_TOKEN}/REDACTED/g" | tr '\n' ' ')
+            echo "::error::git push failed (exit $PUSH_CODE): $SAFE"
+            exit 1
+          fi
+          echo "Publish succeeded: $PUSH_OUT"
