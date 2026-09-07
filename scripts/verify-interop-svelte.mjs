@@ -5,8 +5,9 @@
 //     proving a real Aeon-signal-driven prop reaches a real Svelte component
 //     without remounting it.
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './lib/launch-browser.mjs';
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', headless: true, args: ['--headless=new', '--no-sandbox'] });
+const browser = await chromium.launch(chromiumLaunchOptions());
 const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.stack || String(e)));

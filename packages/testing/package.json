@@ -2,13 +2,25 @@
   "name": "@aeon-framework/testing",
   "version": "0.1.0",
   "description": "Aeon testing utilities: render a component into a real (Happy DOM) document, fire events, and clean up between tests. No virtual-DOM flush to wait on — Aeon's signal writes apply synchronously.",
+  "license": "MIT",
   "type": "module",
   "main": "./src/index.js",
-  "exports": { ".": "./src/index.js" },
+  "exports": {
+    ".": "./src/index.js"
+  },
   "types": "./src/index.d.ts",
   "sideEffects": false,
-  "engines": { "node": ">=18" },
-  "files": ["src"],
-  "publishConfig": { "access": "public" },
-  "dependencies": { "@aeon-framework/core": "^0.1.0", "happy-dom": "^20.0.0" }
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@aeon-framework/core": "^0.1.0",
+    "happy-dom": "^20.0.0"
+  }
 }

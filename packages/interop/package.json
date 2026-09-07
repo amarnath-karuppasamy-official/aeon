@@ -2,6 +2,7 @@
   "name": "@aeon-framework/interop",
   "version": "0.2.0",
   "description": "Embed Aeon components inside another framework's tree (React/Vue/Svelte/Angular) or read Aeon signals from it, and the reverse: embed a React/Vue/Svelte/Angular component inside an Aeon `html` template. Aeon mounts to a real DOM node it fully owns, so this is a plain escape hatch, not a virtual-DOM reconciliation bridge.",
+  "license": "MIT",
   "type": "module",
   "sideEffects": false,
   "engines": {

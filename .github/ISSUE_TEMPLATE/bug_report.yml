@@ -1,0 +1,81 @@
+name: Bug report
+description: Something in Aeon isn't working the way it should.
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Security vulnerabilities
+        should go through [SECURITY.md](../../SECURITY.md) instead of a
+        public issue.
+
+  - type: input
+    id: package
+    attributes:
+      label: Package(s) affected
+      description: e.g. @aeon-framework/core, @aeon-framework/router
+      placeholder: "@aeon-framework/core"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The exact version(s) from your package.json / package-lock.json
+      placeholder: "0.1.7"
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: >
+        A minimal reproduction is the single most useful thing you can
+        include — a code snippet, a StackBlitz/CodeSandbox link, or a small
+        repo. "It breaks sometimes" without a repro is very hard to fix.
+      placeholder: |
+        html`<code .innerHTML=${someHighlightedMarkup}></code>`
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Where does this happen?
+      multiple: true
+      options:
+        - Browser (client-side render/hydrate)
+        - Server-side render (renderToString)
+        - Static prerender (SSG)
+        - Build/CLI (aeon build/dev/check)
+        - Node.js (no browser)
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js version (if relevant)
+      placeholder: "20.11.0"
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Anything else?
+      description: Browser + version, stack traces, screenshots, etc.

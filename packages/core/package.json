@@ -2,6 +2,7 @@
   "name": "@aeon-framework/core",
   "version": "0.1.7",
   "description": "Aeon core: signals, fine-grained DOM rendering, components. No virtual DOM.",
+  "license": "MIT",
   "type": "module",
   "main": "./src/index.js",
   "exports": {

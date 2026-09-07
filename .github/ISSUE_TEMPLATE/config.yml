@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask a question / discuss an idea
+    url: https://github.com/Aeon-framework/aeon/discussions
+    about: For "how do I...", open-ended proposals, and general discussion — not a bug or a concrete feature ask.
+  - name: Report a security vulnerability
+    url: https://github.com/Aeon-framework/aeon/security/advisories/new
+    about: Please do not open a public issue for security vulnerabilities — see SECURITY.md.

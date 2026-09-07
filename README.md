@@ -1,8 +1,19 @@
 # Aeon
 
+[![CI](https://github.com/Aeon-framework/aeon/actions/workflows/ci.yml/badge.svg)](https://github.com/Aeon-framework/aeon/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@aeon-framework/core.svg)](https://www.npmjs.com/package/@aeon-framework/core)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+
 A full-stack, signal-first web framework. Fine-grained reactivity, direct DOM
 patching (no virtual DOM), a router, reactive forms, and dependency injection —
 all without decorators, NgModules, or a required compiler step.
+
+Docs & landing page: **https://aeon-framework.github.io/**
+
+Contributing? Read [CONTRIBUTING.md](./CONTRIBUTING.md) and the
+[Code of Conduct](./CODE_OF_CONDUCT.md) first. Found a security issue? See
+[SECURITY.md](./SECURITY.md) — please don't file it as a public issue.
+Curious what's stable and what isn't yet? See [VERSIONING.md](./VERSIONING.md).
 
 This is a working v0.1 skeleton: real reactivity, a real renderer, a real
 router/forms/DI, a CLI, and a demo app that exercises all of it. It is not a

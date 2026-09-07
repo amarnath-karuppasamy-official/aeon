@@ -3,7 +3,8 @@
 // changes over time via an Aeon signal — proving real reactive prop
 // forwarding, not just a one-shot mount.
 import { chromium } from 'playwright-core';
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', headless: true, args: ['--headless=new', '--no-sandbox'] });
+import { chromiumLaunchOptions } from './lib/launch-browser.mjs';
+const browser = await chromium.launch(chromiumLaunchOptions());
 const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.stack || String(e)));

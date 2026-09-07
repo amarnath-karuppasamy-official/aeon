@@ -1,0 +1,66 @@
+name: CI
+
+# Runs the real test suite, the DOM-free portability check, and a full build
+# on every push and pull request against main — across every Node version
+# Aeon claims to support. Before this workflow existed, nothing verified any
+# of this automatically; a real bug (a case-sensitive property binding like
+# `.innerHTML=` silently becoming a no-op) reached the live docs site
+# undetected because there was no CI gate at all. This is that gate.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    name: test (node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["18.x", "20.x", "22.x"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install workspace dependencies
+        run: npm install --workspaces --include-workspace-root
+
+      - name: Run test suite (every package)
+        run: npm test
+
+      - name: Portability check (core reactivity has zero DOM dependency)
+        run: npm run portability-check
+
+      - name: Build every package/example with a build script
+        run: npm run build
+
+  site-integration:
+    name: docs/landing site — real headless-Chromium integration check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+
+      - name: Install workspace dependencies
+        run: npm install --workspaces --include-workspace-root
+
+      - name: Install verification tooling (playwright-core, isolated from the workspace — see scripts/package.json)
+        run: npm install --prefix scripts
+
+      - name: Install headless Chromium for verification
+        run: npx --prefix scripts playwright-core install --with-deps chromium
+
+      - name: Prerender the site with Aeon's own SSG
+        run: npm run site:prerender
+
+      - name: Verify the prerendered site in a real browser
+        run: npm run site:verify

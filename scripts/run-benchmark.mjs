@@ -3,6 +3,7 @@
 // operation. Correctness is checked separately in
 // verify-benchmark-correctness.mjs — trust these numbers only alongside that.
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './lib/launch-browser.mjs';
 
 const targets = [
   { name: 'Aeon', url: 'http://localhost:8500/index.html' },
@@ -20,11 +21,7 @@ function median(nums) {
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
-const browser = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium',
-  headless: true,
-  args: ['--headless=new', '--no-sandbox'],
-});
+const browser = await chromium.launch(chromiumLaunchOptions());
 
 const results = {};
 

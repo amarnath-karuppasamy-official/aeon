@@ -2,7 +2,8 @@
 // as a leaf inside an Aeon `html` template, with a prop that changes over
 // time via an Aeon signal.
 import { chromium } from 'playwright-core';
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', headless: true, args: ['--headless=new', '--no-sandbox'] });
+import { chromiumLaunchOptions } from './lib/launch-browser.mjs';
+const browser = await chromium.launch(chromiumLaunchOptions());
 const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.stack || String(e)));

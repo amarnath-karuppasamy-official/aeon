@@ -2,6 +2,7 @@
   "name": "@aeon-framework/mcp",
   "version": "0.1.0",
   "description": "Aeon MCP server: gives AI coding assistants tools for real code generation, docs/API search, project conventions, project inspection, and template-binding explanation — Aeon's answer to Angular's `ng mcp`.",
+  "license": "MIT",
   "type": "module",
   "main": "./src/index.js",
   "exports": {

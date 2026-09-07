@@ -3,8 +3,9 @@
 // the regression test for the list() reference-identity fix (row content
 // must actually change for the 100 updated rows, and only those 100).
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './lib/launch-browser.mjs';
 const url = process.argv[2];
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', headless: true, args: ['--headless=new', '--no-sandbox'] });
+const browser = await chromium.launch(chromiumLaunchOptions());
 const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.stack || String(e)));

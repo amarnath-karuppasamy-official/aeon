@@ -2,6 +2,7 @@
   "name": "@aeon-framework/cli",
   "version": "0.2.0",
   "description": "Aeon CLI: scaffold, dev server, and production build powered by esbuild — production builds also precompile templates at build time (AOT milestone 2, @aeon-framework/compiler's aeonPrecompile).",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "aeon": "./bin/aeon.mjs"

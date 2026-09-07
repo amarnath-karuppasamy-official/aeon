@@ -2,6 +2,7 @@
   "name": "@aeon-framework/forms",
   "version": "0.1.1",
   "description": "Aeon forms: signal-backed controls and groups with composable validators.",
+  "license": "MIT",
   "type": "module",
   "main": "./src/index.js",
   "exports": {

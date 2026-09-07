@@ -2,6 +2,7 @@
   "name": "@aeon-framework/ssg",
   "version": "0.1.0",
   "description": "Aeon SSG: prerender routes to real static .html files on disk using the real @aeon-framework/ssr renderer (no parallel string renderer), for the aeon prerender CLI command.",
+  "license": "MIT",
   "type": "module",
   "main": "./src/index.js",
   "exports": {

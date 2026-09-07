@@ -2,6 +2,7 @@
   "name": "@aeon-framework/compiler",
   "version": "0.2.1",
   "description": "Aeon AOT compiler: whole-project static analysis (real binding-kind validation, unused @aeon-framework/* imports, unreachable routes) powering `aeon check`, plus a build-time esbuild plugin (aeonPrecompile) that runs the real template compiler at build time so `aeon build` output skips one tree-walk per template shape on first render. Not whole-program dead-code elimination — that remains a further-out milestone.",
+  "license": "MIT",
   "type": "module",
   "main": "./src/index.js",
   "exports": {

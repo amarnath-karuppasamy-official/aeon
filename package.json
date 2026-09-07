@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "description": "Aeon — a full-stack, signal-based web framework built for minimal load and maximum render speed.",
+  "license": "MIT",
   "workspaces": [
     "packages/*",
     "examples/*",

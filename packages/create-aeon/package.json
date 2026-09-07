@@ -2,6 +2,7 @@
   "name": "create-aeon",
   "version": "0.1.2",
   "description": "Scaffold a new Aeon app: npm create aeon@latest my-app",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "create-aeon": "./bin/create-aeon.mjs"

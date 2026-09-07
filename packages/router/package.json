@@ -2,6 +2,7 @@
   "name": "@aeon-framework/router",
   "version": "0.1.2",
   "description": "Aeon router: signal-driven client-side routing.",
+  "license": "MIT",
   "type": "module",
   "main": "./src/index.js",
   "exports": {

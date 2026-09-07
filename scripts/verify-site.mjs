@@ -26,6 +26,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './lib/launch-browser.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', 'site', 'dist');
 const PORT = 8912;
@@ -78,11 +79,7 @@ function check(name, condition, detail) {
   }
 }
 
-const browser = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium',
-  headless: true,
-  args: ['--headless=new', '--no-sandbox'],
-});
+const browser = await chromium.launch(chromiumLaunchOptions());
 const page = await browser.newPage();
 page.on('pageerror', (e) => errors.push('pageerror: ' + (e.stack || String(e))));
 page.on('console', (m) => {

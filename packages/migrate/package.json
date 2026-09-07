@@ -2,6 +2,7 @@
   "name": "@aeon-framework/migrate",
   "version": "0.1.0",
   "description": "Best-effort codemod: converts common React function components (useState + plain JSX) to Aeon. Marker-comment triggered, never overwrites your file, flags anything it can't safely convert instead of guessing.",
+  "license": "MIT",
   "type": "module",
   "sideEffects": false,
   "main": "./src/index.js",

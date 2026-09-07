@@ -2,13 +2,24 @@
   "name": "@aeon-framework/animate",
   "version": "0.1.0",
   "description": "Aeon animate: signal-driven enter/leave transitions — a class-toggle + transitionend-or-timeout primitive, and a keyed animatedList() helper for list rows that animate out before they're actually removed.",
+  "license": "MIT",
   "type": "module",
   "main": "./src/index.js",
-  "exports": { ".": "./src/index.js" },
+  "exports": {
+    ".": "./src/index.js"
+  },
   "types": "./src/index.d.ts",
   "sideEffects": false,
-  "engines": { "node": ">=18" },
-  "files": ["src"],
-  "publishConfig": { "access": "public" },
-  "dependencies": { "@aeon-framework/core": "^0.1.0" }
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@aeon-framework/core": "^0.1.0"
+  }
 }
