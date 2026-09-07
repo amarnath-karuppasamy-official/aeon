@@ -11,7 +11,7 @@
   "types": "./src/index.d.ts",
   "sideEffects": false,
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "bin": {
     "aeon-mcp": "./bin/aeon-mcp.mjs"

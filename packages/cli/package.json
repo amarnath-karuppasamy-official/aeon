@@ -23,5 +23,8 @@
     "src",
     "template",
     "template-ts"
-  ]
+  ],
+  "engines": {
+    "node": ">=20"
+  }
 }

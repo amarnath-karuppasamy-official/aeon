@@ -20,7 +20,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ["18.x", "20.x", "22.x"]
+        # >=20, not >=18: several packages (compiler, mcp, ssr, ssg, testing,
+        # cli) depend on happy-dom@20, which itself requires Node >=20.0.0 —
+        # see the "engines" fix in this same commit. Node 18 genuinely fails
+        # here, it's not a CI quirk.
+        node-version: ["20.x", "22.x", "24.x"]
     steps:
       - uses: actions/checkout@v4
 

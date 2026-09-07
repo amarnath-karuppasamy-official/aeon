@@ -37,7 +37,14 @@ cd aeon
 npm install --workspaces --include-workspace-root
 ```
 
-Node 18+ is required (see `engines` in `package.json`).
+Node 20+ is required to work on this repo (see `engines` in the root
+`package.json`) — the dev/test tooling (`compiler`, `mcp`, `ssr`, `ssg`,
+`testing`, `cli`) depends on `happy-dom@20`, which itself requires Node
+>=20. Standalone runtime packages like `core`, `router`, `di`, `forms`,
+`http`, `i18n`, `animate`, `interop`, `devtools`, `migrate`, and
+`create-aeon` have no such dependency and still declare `>=18` in their own
+`package.json`, since that's genuinely all a consumer of just those
+packages needs.
 
 ## Running things locally
 
